@@ -1,9 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { RecipeMetadata, RecipeRevision } from '@/lib/recipeStorage';
-import { updateRecipeAction } from '@/app/actions';
+import { updateRecipeAction, refineRecipeContentAction } from '@/app/actions';
+import React from 'react';
+import dynamic from 'next/dynamic';
+
+import { MarkdownEditorHandle } from './MarkdownEditor';
+
+// Dynamically import the MarkdownEditor component to prevent SSR "document is not defined" issues
+const MarkdownEditor = dynamic(
+  () => import('./MarkdownEditor'),
+  { ssr: false }
+);
 
 interface RecipeDetailClientProps {
   recipe: RecipeMetadata;
@@ -21,6 +31,8 @@ export default function RecipeDetailClient({
   currentRev 
 }: RecipeDetailClientProps) {
   const router = useRouter();
+  const textareaRef = useRef<MarkdownEditorHandle>(null);
+  
   const [checkedIngredients, setCheckedIngredients] = useState<Record<number, boolean>>({});
   const [completedSteps, setCompletedSteps] = useState<Record<number, boolean>>({});
 
@@ -29,6 +41,11 @@ export default function RecipeDetailClient({
   const [editContent, setEditContent] = useState(rawContent);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // AI Copilot states
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isAiRefining, setIsAiRefining] = useState(false);
+  const [aiRefineError, setAiRefineError] = useState<string | null>(null);
 
   // Dropdown states
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
@@ -48,6 +65,11 @@ export default function RecipeDetailClient({
   };
 
   const handleSave = async () => {
+    if (!editContent.trim()) {
+      setSaveError('Recipe content cannot be empty.');
+      return;
+    }
+
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -63,6 +85,32 @@ export default function RecipeDetailClient({
       setSaveError(err.message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAiRefine = async () => {
+    if (!aiPrompt.trim()) return;
+    
+    setIsAiRefining(true);
+    setAiRefineError(null);
+    try {
+      const result = await refineRecipeContentAction(editContent, aiPrompt);
+      if (result.success && result.refinedContent) {
+        const editor = textareaRef.current;
+        if (editor) {
+          editor.view?.focus();
+          editor.applyTextChange(result.refinedContent);
+        } else {
+          setEditContent(result.refinedContent);
+        }
+        setAiPrompt('');
+      } else {
+        setAiRefineError(result.error || 'Failed to refine content.');
+      }
+    } catch (err: any) {
+      setAiRefineError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setIsAiRefining(false);
     }
   };
 
@@ -91,16 +139,73 @@ export default function RecipeDetailClient({
           </div>
         )}
 
-        <textarea
-          className="form-input"
-          style={{ fontFamily: 'monospace', fontSize: '0.95rem', width: '100%', minHeight: '60vh', resize: 'vertical', padding: '1rem', lineHeight: '1.6' }}
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          disabled={isSaving}
-        />
+        {/* AI Copilot Panel */}
+        <div 
+          style={{ 
+            marginBottom: '1.5rem', 
+            padding: '1.25rem', 
+            backgroundColor: 'var(--secondary-light)', 
+            borderRadius: 'var(--radius-md)', 
+            border: '1px solid var(--border-color)' 
+          }}
+        >
+          <label htmlFor="ai-prompt" style={{ display: 'block', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--secondary)' }}>
+            AI Recipe Assistant (Copilot)
+          </label>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <input
+              id="ai-prompt"
+              type="text"
+              className="form-input"
+              style={{ flex: 1, minWidth: '200px', backgroundColor: '#fff' }}
+              placeholder="Ask AI to edit... e.g., 'make green onions optional', 'get rid of the intro bit', 'add a note about freezing'"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAiRefine();
+                }
+              }}
+              disabled={isAiRefining || isSaving}
+            />
+            <button
+              onClick={handleAiRefine}
+              className="btn btn-secondary"
+              disabled={isAiRefining || isSaving || !aiPrompt.trim()}
+              style={{ minWidth: '100px' }}
+            >
+              {isAiRefining ? (
+                <>
+                  <div className="spinner" style={{ width: '12px', height: '12px', borderTopColor: '#fff', marginRight: '0.4rem' }} />
+                  Refining...
+                </>
+              ) : (
+                'Refine'
+              )}
+            </button>
+          </div>
+          
+          {aiRefineError && (
+            <div style={{ color: 'var(--primary)', fontSize: '0.85rem', marginTop: '0.5rem', fontWeight: 'bold' }}>
+              Copilot Error: {aiRefineError}
+            </div>
+          )}
+        </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
-          <button onClick={handleSave} className="btn btn-primary" disabled={isSaving} style={{ minWidth: '120px' }}>
+        {/* Pre-built Syntax Highlighting Code Editor */}
+        <div style={{ minHeight: '60vh', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <MarkdownEditor
+            ref={textareaRef}
+            value={editContent}
+            onChange={(val) => setEditContent(val)}
+            disabled={isSaving || isAiRefining}
+          />
+        </div>
+
+        {/* Save/Cancel Controls */}
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || isAiRefining} style={{ minWidth: '120px' }}>
             {isSaving ? (
               <>
                 <div className="spinner" style={{ width: '14px', height: '14px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
@@ -110,7 +215,17 @@ export default function RecipeDetailClient({
               'Save Changes'
             )}
           </button>
-          <button onClick={() => { setIsEditing(false); setEditContent(rawContent); setSaveError(null); }} className="btn btn-outline" disabled={isSaving}>
+          <button 
+            type="button"
+            onClick={() => { 
+              setIsEditing(false); 
+              setEditContent(rawContent); 
+              setSaveError(null); 
+              setAiRefineError(null);
+            }} 
+            className="btn btn-outline" 
+            disabled={isSaving || isAiRefining}
+          >
             Cancel
           </button>
         </div>

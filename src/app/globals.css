@@ -595,3 +595,136 @@ a:hover {
   font-size: 4rem;
   margin-bottom: 1rem;
 }
+
+/* Monospace Editor Styles */
+.editor-container {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: #faf8f5;
+  overflow: hidden;
+}
+
+.editor-textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 1.25rem;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 22px;
+  letter-spacing: 0px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text-color); /* Fallback and color for caret */
+  -webkit-text-fill-color: transparent; /* Makes text characters transparent in Webkit but keeps caret visible */
+  background: transparent;
+  caret-color: var(--text-color) !important;
+  z-index: 10;
+  resize: none;
+  border: none;
+  outline: none;
+  box-sizing: border-box;
+  overflow-y: scroll;
+}
+
+.editor-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 1.25rem;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 22px;
+  letter-spacing: 0px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text-color);
+  z-index: 5;
+  background-color: transparent;
+  border: none;
+  pointer-events: none;
+  box-sizing: border-box;
+  overflow-y: scroll;
+  scrollbar-width: none; /* Hide scrollbar for alignment */
+}
+
+.editor-highlight::-webkit-scrollbar {
+  display: none; /* Webkit browser scrollbar hiding */
+}
+
+/* Syntax Highlighting Colors */
+.syntax-frontmatter-divider {
+  color: #c2410c; /* orange */
+  font-weight: bold;
+}
+
+.syntax-frontmatter-key {
+  color: #4f46e5; /* indigo */
+  font-weight: bold;
+}
+
+.syntax-frontmatter-val {
+  color: #0d9488; /* teal */
+}
+
+.syntax-h1 {
+  color: #b91c1c; /* red-700 */
+  font-weight: bold;
+  background-color: #fee2e2;
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+}
+
+.syntax-h2 {
+  color: #0369a1; /* sky-700 */
+  font-weight: bold;
+  background-color: #e0f2fe;
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+}
+
+.syntax-h3 {
+  color: #15803d; /* green-700 */
+  font-weight: bold;
+  background-color: #dcfce7;
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+}
+
+.syntax-list-bullet {
+  color: #ea580c; /* orange-600 */
+  font-weight: bold;
+}
+
+.syntax-bold {
+  color: #0f172a; /* dark slate */
+  font-weight: bold;
+}
+
+.syntax-bold-marker {
+  color: #94a3b8; /* slate-400 */
+}
+
+.syntax-link-text {
+  color: #2563eb; /* blue-600 */
+  text-decoration: underline;
+}
+
+.syntax-link-bracket {
+  color: #94a3b8; /* slate-400 */
+}
+
+.syntax-link-url {
+  color: #64748b; /* slate-500 */
+  font-style: italic;
+}
+

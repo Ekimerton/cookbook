@@ -5,6 +5,7 @@ import { saveRecipe, RecipeMetadata, updateRecipe } from '@/lib/recipeStorage';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
+import { GoogleGenAI } from '@google/genai';
 
 // Helper to load the local settings key on the server
 function getGeminiApiKey(): string | undefined {
@@ -115,5 +116,63 @@ export async function updateRecipeAction(slug: string, rawContent: string) {
   } catch (error: any) {
     console.error('Error updating recipe:', error);
     return { success: false, error: error.message || 'Failed to update recipe.' };
+  }
+}
+
+export async function refineRecipeContentAction(rawContent: string, prompt: string) {
+  try {
+    if (!rawContent) {
+      return { success: false, error: 'Recipe content is required.' };
+    }
+    if (!prompt) {
+      return { success: false, error: 'Prompt is required.' };
+    }
+
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      return { 
+        success: false, 
+        error: 'Gemini API Key is not configured. Please add your GEMINI_API_KEY in user-settings.json to enable the AI Recipe Assistant.' 
+      };
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          text: `You are an expert culinary editor. You will be given the raw recipe markdown content (including YAML frontmatter at the top) and a prompt describing a refinement or edit.
+Apply the requested changes to the recipe content and output the entire modified raw markdown file.
+
+CRITICAL INSTRUCTIONS:
+1. Output the entire markdown file, including the unchanged parts.
+2. Maintain the YAML frontmatter format (title, originalUrl, date, description, version) exactly.
+3. Do NOT wrap your output in triple backticks (e.g. \`\`\`markdown or \`\`\`yaml). Return the raw text directly.
+4. Do NOT include any conversational filler, notes, or intros/outros. Return ONLY the raw modified markdown file.
+5. If the request is invalid or cannot be fulfilled, return the original raw content exactly.
+
+User Refinement Request: "${prompt}"
+
+Current Raw Recipe Content:
+${rawContent}`
+        }
+      ]
+    });
+
+    if (!response.text) {
+      throw new Error('Gemini returned an empty response.');
+    }
+
+    // Clean up if the model wrapped it in markdown backticks anyway
+    let cleanedText = response.text;
+    const match = cleanedText.match(/^(?:```(?:markdown|yaml|md)?\n)?([\s\S]*?)(?:\n```)?$/i);
+    if (match) {
+      cleanedText = match[1];
+    }
+
+    return { success: true, refinedContent: cleanedText.trim() };
+  } catch (error: any) {
+    console.error('Error refining recipe with AI:', error);
+    return { success: false, error: error.message || 'AI refinement failed.' };
   }
 }
