@@ -57,6 +57,7 @@ function fetchHtmlViaCurl(urlStr: string): { html: string; statusCode: number } 
   const result = spawnSync('curl', [
     '-s',
     '-L',
+    '--max-time', '10', // 10 seconds timeout
     '-w', '\n%{http_code}', // Print status code on a new line at the end
     '-A', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -90,16 +91,24 @@ function fetchHtmlViaCurl(urlStr: string): { html: string; statusCode: number } 
 // Fetch markdown representation of a page via Jina Reader proxy
 async function fetchViaJina(urlStr: string): Promise<string> {
   const jinaUrl = `https://r.jina.ai/${encodeURIComponent(urlStr)}`;
-  const response = await fetch(jinaUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    next: { revalidate: 0 }
-  });
-  if (!response.ok) {
-    throw new Error(`Jina Reader returned status: ${response.statusText} (${response.status})`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+  try {
+    const response = await fetch(jinaUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+      next: { revalidate: 0 }
+    });
+    if (!response.ok) {
+      throw new Error(`Jina Reader returned status: ${response.statusText} (${response.status})`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return await response.text();
 }
 
 // Clean HTML content to reduce context window tokens
@@ -126,12 +135,37 @@ function cleanHtmlForModel(content: string): string {
   return content.replace(/\s+/g, ' ').trim();
 }
 
+// Helper to retry Gemini API calls on transient errors (503, 429)
+export async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isTransient = 
+      error.status === 503 || 
+      error.status === 429 || 
+      (error.message && (
+        error.message.includes('503') || 
+        error.message.includes('429') || 
+        error.message.includes('temporary') || 
+        error.message.includes('overloaded') || 
+        error.message.includes('unavailable')
+      ));
+      
+    if (retries > 0 && isTransient) {
+      console.warn(`Transient API error encountered (${error.status || 'unknown status'}). Retrying in ${delay}ms... (${retries} retries left)`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
 // Parse recipe content (HTML or plain text) using Google Gemini LLM with Structured Schema Output
 export async function parseRecipeContentWithGemini(content: string, url: string, apiKey: string): Promise<ExtractedRecipe> {
   const cleanedContent = cleanHtmlForModel(content);
   const ai = new GoogleGenAI({ apiKey });
   
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: [
       {
@@ -165,7 +199,7 @@ ${cleanedContent}`
         required: ['title', 'ingredients', 'instructions']
       }
     }
-  });
+  }));
 
   if (!response.text) {
     throw new Error('Gemini returned an empty response.');
@@ -187,7 +221,7 @@ async function scrapeRecipeWithGeminiGrounding(url: string, apiKey: string): Pro
   const ai = new GoogleGenAI({ apiKey });
   const keywords = getSearchKeywordsFromUrl(url);
   
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: [
       {
@@ -207,7 +241,7 @@ Do not search for other pages; focus on extracting the details specifically from
     config: {
       tools: [{ googleSearch: {} }] // Enabled search grounding, NO responseMimeType / responseSchema!
     }
-  });
+  }));
 
   if (!response.text) {
     throw new Error('Gemini returned an empty response.');

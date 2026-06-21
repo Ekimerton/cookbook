@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { spawn } from 'child_process';
+import { GoogleGenAI } from '@google/genai';
 
 export interface RecipeMetadata {
   title: string;
@@ -54,18 +55,75 @@ function runGitCommand(args: string[]): Promise<string> {
   });
 }
 
+function getGeminiApiKey(): string | undefined {
+  let apiKey = process.env.GEMINI_API_KEY;
+  try {
+    const settingsPath = path.join(process.cwd(), 'user-settings.json');
+    if (fs.existsSync(settingsPath)) {
+      const fileContent = fs.readFileSync(settingsPath, 'utf-8');
+      const settings = JSON.parse(fileContent);
+      const key = settings.GEMINI_API_KEY || settings.geminiApiKey || settings.gemini_api_key;
+      if (key) {
+        apiKey = key;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to read user-settings.json:', e);
+  }
+  return apiKey;
+}
+
 // Automatically stage, commit and push recipe on creation or update
 async function gitCommitAndPushRecipe(filename: string, title: string, isUpdate: boolean = false) {
   try {
     // 1. git add <filename>
     await runGitCommand(['add', filename]);
     
-    // 2. git commit -m "Add/Update recipe: <title>"
-    const commitMsg = isUpdate ? `Update recipe: ${title}` : `Add recipe: ${title}`;
-    await runGitCommand(['commit', '-m', commitMsg]);
-    console.log(`Git: Committed recipe "${title}" (${filename})`);
+    // 2. Determine commit message (summarize diff if update and Gemini key is available)
+    let commitMsg = isUpdate ? `Update recipe: ${title}` : `Add recipe: ${title}`;
     
-    // 3. Check if remote exists, then push
+    if (isUpdate) {
+      try {
+        const diff = await runGitCommand(['diff', '--cached', filename]);
+        const apiKey = getGeminiApiKey();
+        if (diff && apiKey) {
+          const ai = new GoogleGenAI({ apiKey });
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [
+              {
+                text: `You are an expert culinary developer. You will be given a git diff of updates made to a recipe file named "${title}".
+Generate a concise, single-line git commit message (up to 72 characters) that summarizes the exact changes made to this recipe (e.g. what ingredients were changed, steps updated, or notes added).
+
+Format:
+Update recipe: ${title} (<summary of changes>)
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the single line commit message. No quotes, no prefix, no explanations, no formatting, no markdown.
+2. Be descriptive but concise. Limit to 72 characters if possible.
+3. Example: "Update recipe: Garlic Roast Chicken (increase cooking time, add butter)"
+4. If no meaningful changes can be summarized, return "Update recipe: ${title}"
+
+Git Diff:
+${diff}`
+              }
+            ]
+          });
+          
+          if (response.text && response.text.trim()) {
+            commitMsg = response.text.trim().replace(/^["']|["']$/g, '');
+          }
+        }
+      } catch (diffErr) {
+        console.error('Git: Failed to generate AI commit message, using fallback:', diffErr);
+      }
+    }
+    
+    // 3. git commit -m <msg>
+    await runGitCommand(['commit', '-m', commitMsg]);
+    console.log(`Git: Committed recipe "${title}" (${filename}) with message: "${commitMsg}"`);
+    
+    // 4. Check if remote exists, then push
     const remote = await runGitCommand(['remote']);
     if (remote) {
       console.log('Git: Pushing to remote...');

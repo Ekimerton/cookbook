@@ -40,6 +40,7 @@ export default function NewRecipePage() {
 
     setIsExtracting(true);
     setExtractError(null);
+    let keepSpinner = false;
 
     try {
       const result = await extractRecipeAction(url);
@@ -54,6 +55,7 @@ export default function NewRecipePage() {
         // Save immediately!
         const saveResult = await saveRecipeAction(extracted);
         if (saveResult.success && saveResult.slug) {
+          keepSpinner = true;
           // Take them directly to the recipe page
           router.push(`/recipes/${saveResult.slug}`);
           return; // Skip setting isExtracting to false to keep spinner active during redirect transition
@@ -66,7 +68,9 @@ export default function NewRecipePage() {
     } catch (err: any) {
       setExtractError(err.message || 'An unexpected error occurred during extraction.');
     } finally {
-      setIsExtracting(false);
+      if (!keepSpinner) {
+        setIsExtracting(false);
+      }
     }
   };
 
@@ -76,6 +80,7 @@ export default function NewRecipePage() {
 
     setIsExtracting(true);
     setExtractError(null);
+    let keepSpinner = false;
 
     try {
       const result = await extractRecipeFromContentAction(pasteContent, url);
@@ -88,6 +93,7 @@ export default function NewRecipePage() {
 
         const saveResult = await saveRecipeAction(extracted);
         if (saveResult.success && saveResult.slug) {
+          keepSpinner = true;
           router.push(`/recipes/${saveResult.slug}`);
           return;
         } else {
@@ -99,7 +105,9 @@ export default function NewRecipePage() {
     } catch (err: any) {
       setExtractError(err.message || 'An unexpected error occurred during copy-paste extraction.');
     } finally {
-      setIsExtracting(false);
+      if (!keepSpinner) {
+        setIsExtracting(false);
+      }
     }
   };
 
@@ -155,11 +163,12 @@ export default function NewRecipePage() {
     };
 
     const result = await saveRecipeAction(recipeData);
-    setIsSaving(false);
 
     if (result.success && result.slug) {
       router.push(`/recipes/${result.slug}`);
+      // Do not set isSaving to false, keeping the spinner active during redirect
     } else {
+      setIsSaving(false);
       setSaveError(result.error || 'Failed to save recipe.');
     }
   };

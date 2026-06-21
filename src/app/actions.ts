@@ -1,6 +1,6 @@
 'use server';
 
-import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini } from '@/lib/recipeParser';
+import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini, withRetry } from '@/lib/recipeParser';
 import { saveRecipe, RecipeMetadata, updateRecipe } from '@/lib/recipeStorage';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
@@ -137,7 +137,7 @@ export async function refineRecipeContentAction(rawContent: string, prompt: stri
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
+    const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [
         {
@@ -157,7 +157,7 @@ Current Raw Recipe Content:
 ${rawContent}`
         }
       ]
-    });
+    }));
 
     if (!response.text) {
       throw new Error('Gemini returned an empty response.');
