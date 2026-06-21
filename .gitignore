@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local user settings
+user-settings.json
+
+# nested recipes repository
+/data/recipes/
