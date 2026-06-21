@@ -17,6 +17,14 @@ export interface RecipeFile {
   slug: string;
   metadata: RecipeMetadata;
   content: string;
+  rawContent: string;
+}
+
+export interface RecipeRevision {
+  commitSha: string;
+  date: string;
+  commitMessage: string;
+  versionString: string;
 }
 
 const RECIPES_DIR = path.join(process.cwd(), 'data', 'recipes');
@@ -46,14 +54,15 @@ function runGitCommand(args: string[]): Promise<string> {
   });
 }
 
-// Automatically stage, commit and push recipe on creation
-async function gitCommitAndPushRecipe(filename: string, title: string) {
+// Automatically stage, commit and push recipe on creation or update
+async function gitCommitAndPushRecipe(filename: string, title: string, isUpdate: boolean = false) {
   try {
     // 1. git add <filename>
     await runGitCommand(['add', filename]);
     
-    // 2. git commit -m "Add recipe: <title>"
-    await runGitCommand(['commit', '-m', `Add recipe: ${title}`]);
+    // 2. git commit -m "Add/Update recipe: <title>"
+    const commitMsg = isUpdate ? `Update recipe: ${title}` : `Add recipe: ${title}`;
+    await runGitCommand(['commit', '-m', commitMsg]);
     console.log(`Git: Committed recipe "${title}" (${filename})`);
     
     // 3. Check if remote exists, then push
@@ -224,8 +233,8 @@ export function getAllRecipes(): (RecipeMetadata & { slug: string })[] {
   });
 }
 
-// Get specific recipe details by slug
-export function getRecipeBySlug(slug: string): RecipeFile | null {
+// Get specific recipe details by slug, optionally from a specific commit
+export function getRecipeBySlug(slug: string, commitSha?: string): RecipeFile | null {
   ensureRecipesDir();
 
   const filePath = path.join(RECIPES_DIR, `${slug}.md`);
@@ -233,7 +242,27 @@ export function getRecipeBySlug(slug: string): RecipeFile | null {
     return null;
   }
 
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  let fileContent = '';
+  if (commitSha) {
+    try {
+      const { spawnSync } = require('child_process');
+      const showResult = spawnSync('git', ['show', `${commitSha}:${slug}.md`], {
+        cwd: RECIPES_DIR,
+      });
+      if (showResult.status === 0) {
+        fileContent = showResult.stdout?.toString() || '';
+      } else {
+        console.error(`Git show failed for commit ${commitSha}:`, showResult.stderr?.toString());
+        return null;
+      }
+    } catch (err) {
+      console.error(`Failed to show file at commit ${commitSha}:`, err);
+      return null;
+    }
+  } else {
+    fileContent = fs.readFileSync(filePath, 'utf-8');
+  }
+
   const { data, content } = matter(fileContent);
   const parsedBody = parseMarkdownRecipeBody(content);
 
@@ -251,5 +280,102 @@ export function getRecipeBySlug(slug: string): RecipeFile | null {
     slug,
     metadata,
     content,
+    rawContent: fileContent,
   };
+}
+
+// Get git commit history and version numbering for a recipe
+export function getRecipeRevisions(slug: string): RecipeRevision[] {
+  ensureRecipesDir();
+  const filename = `${slug}.md`;
+  const filePath = path.join(RECIPES_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+
+  try {
+    const { spawnSync } = require('child_process');
+    const result = spawnSync('git', ['log', '--follow', '--format=%H|%aI|%s', '--', filename], {
+      cwd: RECIPES_DIR,
+    });
+
+    if (result.status !== 0) {
+      console.warn('Git log failed:', result.stderr?.toString() || 'unknown error');
+      return [];
+    }
+
+    const output = result.stdout?.toString().trim();
+    if (!output) {
+      return [];
+    }
+
+    const lines = output.split('\n').filter((l: string) => l.trim().length > 0);
+    const commits = lines.map((line: string) => {
+      const [commitSha, date, ...messageParts] = line.split('|');
+      return {
+        commitSha,
+        date: date ? new Date(date).toISOString().split('T')[0] : '',
+        commitMessage: messageParts.join('|'),
+      };
+    });
+
+    // Chronological order (oldest to newest) to assign version sub-numbers (e.g. 1.1, 1.2, 2.1)
+    const chronoCommits = [...commits].reverse();
+    const versionCounters: Record<number, number> = {};
+
+    const revisions: RecipeRevision[] = chronoCommits.map((c) => {
+      let version = 1;
+      try {
+        const showResult = spawnSync('git', ['show', `${c.commitSha}:${filename}`], {
+          cwd: RECIPES_DIR,
+        });
+        if (showResult.status === 0) {
+          const content = showResult.stdout?.toString() || '';
+          const { data } = matter(content);
+          if (data && typeof data.version === 'number') {
+            version = data.version;
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to read version for commit ${c.commitSha}:`, err);
+      }
+
+      versionCounters[version] = (versionCounters[version] || 0) + 1;
+      const versionString = `${version}.${versionCounters[version]}`;
+
+      return {
+        ...c,
+        versionString,
+      };
+    });
+
+    // Return newest first for display
+    return revisions.reverse();
+  } catch (e) {
+    console.error('Failed to get recipe revisions:', e);
+    return [];
+  }
+}
+
+export function updateRecipe(slug: string, rawContent: string): { success: boolean; error?: string } {
+  ensureRecipesDir();
+  const filePath = path.join(RECIPES_DIR, `${slug}.md`);
+  if (!fs.existsSync(filePath)) {
+    return { success: false, error: 'Recipe file does not exist.' };
+  }
+
+  let parsed: any;
+  try {
+    parsed = matter(rawContent);
+  } catch (err: any) {
+    return { success: false, error: `Invalid YAML frontmatter: ${err.message}` };
+  }
+
+  const title = parsed.data.title || slug;
+  fs.writeFileSync(filePath, rawContent, 'utf-8');
+
+  // Trigger git update in the background (isUpdate = true)
+  gitCommitAndPushRecipe(`${slug}.md`, title, true);
+
+  return { success: true };
 }

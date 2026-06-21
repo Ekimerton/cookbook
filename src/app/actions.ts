@@ -1,7 +1,7 @@
 'use server';
 
 import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini } from '@/lib/recipeParser';
-import { saveRecipe, RecipeMetadata } from '@/lib/recipeStorage';
+import { saveRecipe, RecipeMetadata, updateRecipe } from '@/lib/recipeStorage';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
@@ -90,5 +90,30 @@ export async function saveRecipeAction(recipeData: Omit<RecipeMetadata, 'date' |
   } catch (error: any) {
     console.error('Error saving recipe:', error);
     return { success: false, error: error.message || 'Failed to save recipe.' };
+  }
+}
+
+export async function updateRecipeAction(slug: string, rawContent: string) {
+  try {
+    if (!slug) {
+      return { success: false, error: 'Slug is required.' };
+    }
+    if (!rawContent) {
+      return { success: false, error: 'Content is required.' };
+    }
+
+    const result = updateRecipe(slug, rawContent);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    // Revalidate lists and this specific details route
+    revalidatePath('/');
+    revalidatePath(`/recipes/${slug}`);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating recipe:', error);
+    return { success: false, error: error.message || 'Failed to update recipe.' };
   }
 }
