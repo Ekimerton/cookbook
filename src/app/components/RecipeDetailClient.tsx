@@ -77,8 +77,8 @@ export default function RecipeDetailClient({
       const result = await updateRecipeAction(slug, editContent);
       if (result.success) {
         setIsEditing(false);
-        // Refresh page to load parsed changes
-        window.location.reload();
+        // Redirect to the recipe detail page to show the latest version (removing revision queries)
+        window.location.href = `/recipes/${slug}`;
       } else {
         setSaveError(result.error || 'Failed to save changes.');
       }
@@ -125,6 +125,8 @@ export default function RecipeDetailClient({
   } else if (revisions.length > 0) {
     currentVersionString = revisions[0].versionString; // Latest committed version
   }
+
+  const isLatest = !currentRev || (revisions.length > 0 && currentRev === revisions[0].commitSha);
 
   if (isEditing) {
     return (
@@ -237,7 +239,8 @@ export default function RecipeDetailClient({
   return (
     <article className="recipe-container">
       {/* Historical Revision Banner */}
-      {currentRev && (
+      {/* Historical Revision Banner */}
+      {!isLatest && currentRev && (
         <div 
           style={{
             backgroundColor: 'var(--primary-light)',
@@ -282,7 +285,7 @@ export default function RecipeDetailClient({
         
         <div className="recipe-meta-actions">
           {/* Edit Button: only show if on latest version */}
-          {!currentRev && (
+          {isLatest && (
             <button 
               onClick={() => setIsEditing(true)} 
               className="recipe-edit-button"
@@ -296,7 +299,7 @@ export default function RecipeDetailClient({
           )}
 
           {/* Version Dropdown */}
-          <div style={{ position: 'relative' }}>
+          <div className="recipe-version-wrapper">
             <button 
               onClick={() => setShowVersionDropdown(!showVersionDropdown)} 
               className="recipe-edit-button"
@@ -309,66 +312,32 @@ export default function RecipeDetailClient({
             </button>
             
             {showVersionDropdown && (
-              <div 
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  zIndex: 50,
-                  backgroundColor: '#fff',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  minWidth: '240px',
-                  marginTop: '6px',
-                  padding: '0.5rem 0',
-                }}
-              >
+              <div className="version-dropdown">
                 <div style={{ padding: '0.25rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', marginBottom: '0.25rem', fontWeight: 600 }}>
                   Revision History
                 </div>
-                
-                <button
-                  onClick={() => {
-                    setShowVersionDropdown(false);
-                    router.push(`/recipes/${slug}`);
-                  }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '0.5rem 1rem',
-                    background: !currentRev ? 'var(--secondary-light)' : 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    color: !currentRev ? 'var(--secondary)' : 'var(--text-color)',
-                    fontWeight: !currentRev ? 'bold' : 'normal',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <span>Latest version</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{revisions[0]?.versionString || `${recipe.version}.x`}</span>
-                </button>
 
-                {revisions.map((revItem) => (
+                {revisions.map((revItem, index) => (
                   <button
                     key={revItem.commitSha}
                     onClick={() => {
                       setShowVersionDropdown(false);
-                      router.push(`/recipes/${slug}?rev=${revItem.commitSha}`);
+                      if (index === 0) {
+                        router.push(`/recipes/${slug}`);
+                      } else {
+                        router.push(`/recipes/${slug}?rev=${revItem.commitSha}`);
+                      }
                     }}
                     style={{
                       width: '100%',
                       textAlign: 'left',
                       padding: '0.5rem 1rem',
-                      background: currentRev === revItem.commitSha ? 'var(--secondary-light)' : 'none',
+                      background: (currentRev === revItem.commitSha || (index === 0 && isLatest)) ? 'var(--secondary-light)' : 'none',
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: '0.9rem',
-                      color: currentRev === revItem.commitSha ? 'var(--secondary)' : 'var(--text-color)',
-                      fontWeight: currentRev === revItem.commitSha ? 'bold' : 'normal',
+                      color: (currentRev === revItem.commitSha || (index === 0 && isLatest)) ? 'var(--secondary)' : 'var(--text-color)',
+                      fontWeight: (currentRev === revItem.commitSha || (index === 0 && isLatest)) ? 'bold' : 'normal',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '2px'

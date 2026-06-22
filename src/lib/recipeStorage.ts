@@ -80,7 +80,7 @@ async function gitCommitAndPushRecipe(filename: string, title: string, isUpdate:
     await runGitCommand(['add', filename]);
     
     // 2. Determine commit message (summarize diff if update and Gemini key is available)
-    let commitMsg = isUpdate ? `Update recipe: ${title}` : `Add recipe: ${title}`;
+    let commitMsg = isUpdate ? `Update ${title}` : `Create ${title}`;
     
     if (isUpdate) {
       try {
@@ -95,14 +95,12 @@ async function gitCommitAndPushRecipe(filename: string, title: string, isUpdate:
                 text: `You are an expert culinary developer. You will be given a git diff of updates made to a recipe file named "${title}".
 Generate a concise, single-line git commit message (up to 72 characters) that summarizes the exact changes made to this recipe (e.g. what ingredients were changed, steps updated, or notes added).
 
-Format:
-Update recipe: ${title} (<summary of changes>)
-
 CRITICAL INSTRUCTIONS:
 1. Return ONLY the single line commit message. No quotes, no prefix, no explanations, no formatting, no markdown.
-2. Be descriptive but concise. Limit to 72 characters if possible.
-3. Example: "Update recipe: Garlic Roast Chicken (increase cooking time, add butter)"
-4. If no meaningful changes can be summarized, return "Update recipe: ${title}"
+2. Focus directly on the changes being made, but keep it short and descriptive.
+3. Do NOT include "Update recipe: ${title}" or "Update recipe" or the recipe name in the message.
+4. Example: "Increase cooking time and add butter"
+5. If no meaningful changes can be summarized, return "Update ${title}"
 
 Git Diff:
 ${diff}`

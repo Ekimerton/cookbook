@@ -5,29 +5,32 @@
   --text-secondary: #5C5852;
   --card-bg: #FFFFFF;
   --border-color: #E8E2D9;
-  
-  --primary: #5F6F52;       /* Olive Green (formerly orange) */
+
+  --primary: #5F6F52;
+  /* Olive Green (formerly orange) */
   --primary-hover: #4B5841;
   --primary-light: #EBF0E6;
-  
-  --secondary: #2D2A26;     /* Black/Charcoal (formerly green) */
+
+  --secondary: #2D2A26;
+  /* Black/Charcoal (formerly green) */
   --secondary-hover: #12110F;
   --secondary-light: #FAF8F5;
 
-  --accent: #D4A373;        /* Warm Gold */
+  --accent: #D4A373;
+  /* Warm Gold */
   --accent-light: #FEF6EB;
 
   --shadow-sm: 0 2px 4px rgba(45, 42, 38, 0.04);
   --shadow-md: 0 4px 12px rgba(45, 42, 38, 0.08);
   --shadow-lg: 0 8px 24px rgba(45, 42, 38, 0.12);
-  
+
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 20px;
-  
+
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: all 0.15s ease;
-  
+
   --font-serif: Georgia, 'Playfair Display', serif;
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
@@ -38,15 +41,17 @@
   --text-secondary: #AAA49C;
   --card-bg: #1A1917;
   --border-color: #2C2A27;
-  
-  --primary: #768C67;       /* Olive Green in dark theme */
+
+  --primary: #768C67;
+  /* Olive Green in dark theme */
   --primary-hover: #8EA67E;
   --primary-light: #1D2319;
-  
-  --secondary: #F3EFEA;     /* Off-White/Black equivalent in dark theme */
+
+  --secondary: #F3EFEA;
+  /* Off-White/Black equivalent in dark theme */
   --secondary-hover: #FAF8F5;
   --secondary-light: #1C1A17;
-  
+
   --accent: #E3BA8F;
   --accent-light: #2D251D;
 
@@ -62,7 +67,8 @@
   margin: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   background-color: var(--bg-color);
   color: var(--text-color);
@@ -79,7 +85,12 @@ body {
   min-height: 100vh;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-serif);
   font-weight: 700;
   line-height: 1.25;
@@ -150,7 +161,8 @@ a:hover {
   padding: 0.25rem 0;
 }
 
-.nav-link:hover, .nav-link.active {
+.nav-link:hover,
+.nav-link.active {
   color: var(--primary);
 }
 
@@ -379,7 +391,9 @@ a:hover {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Recipe Detail Layout */
@@ -467,11 +481,11 @@ a:hover {
   margin-top: 2px;
 }
 
-.checkbox-item:hover input ~ .checkbox-custom {
+.checkbox-item:hover input~.checkbox-custom {
   border-color: var(--primary);
 }
 
-.checkbox-item input:checked ~ .checkbox-custom {
+.checkbox-item input:checked~.checkbox-custom {
   background-color: var(--primary);
   border-color: var(--primary);
 }
@@ -487,7 +501,7 @@ a:hover {
   margin-bottom: 2px;
 }
 
-.checkbox-item input:checked ~ .checkbox-custom::after {
+.checkbox-item input:checked~.checkbox-custom::after {
   display: block;
 }
 
@@ -497,7 +511,7 @@ a:hover {
   transition: var(--transition-fast);
 }
 
-.checkbox-item input:checked ~ .checkbox-text {
+.checkbox-item input:checked~.checkbox-text {
   color: var(--text-secondary);
   text-decoration: line-through;
 }
@@ -571,13 +585,33 @@ a:hover {
 }
 
 /* Utilities */
-.text-center { text-align: center; }
-.mt-4 { margin-top: 1rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mt-8 { margin-top: 2rem; }
-.mb-8 { margin-bottom: 2rem; }
-.mr-2 { margin-right: 0.5rem; }
-.w-full { width: 100%; }
+.text-center {
+  text-align: center;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mt-8 {
+  margin-top: 2rem;
+}
+
+.mb-8 {
+  margin-bottom: 2rem;
+}
+
+.mr-2 {
+  margin-right: 0.5rem;
+}
+
+.w-full {
+  width: 100%;
+}
 
 .empty-state {
   display: flex;
@@ -621,8 +655,10 @@ a:hover {
   letter-spacing: 0px;
   white-space: pre-wrap;
   word-wrap: break-word;
-  color: var(--text-color); /* Fallback and color for caret */
-  -webkit-text-fill-color: transparent; /* Makes text characters transparent in Webkit but keeps caret visible */
+  color: var(--text-color);
+  /* Fallback and color for caret */
+  -webkit-text-fill-color: transparent;
+  /* Makes text characters transparent in Webkit but keeps caret visible */
   background: transparent;
   caret-color: var(--text-color) !important;
   z-index: 10;
@@ -654,30 +690,36 @@ a:hover {
   pointer-events: none;
   box-sizing: border-box;
   overflow-y: scroll;
-  scrollbar-width: none; /* Hide scrollbar for alignment */
+  scrollbar-width: none;
+  /* Hide scrollbar for alignment */
 }
 
 .editor-highlight::-webkit-scrollbar {
-  display: none; /* Webkit browser scrollbar hiding */
+  display: none;
+  /* Webkit browser scrollbar hiding */
 }
 
 /* Syntax Highlighting Colors */
 .syntax-frontmatter-divider {
-  color: #166534; /* green (formerly orange) */
+  color: #166534;
+  /* green (formerly orange) */
   font-weight: bold;
 }
 
 .syntax-frontmatter-key {
-  color: #4f46e5; /* indigo */
+  color: #4f46e5;
+  /* indigo */
   font-weight: bold;
 }
 
 .syntax-frontmatter-val {
-  color: #0d9488; /* teal */
+  color: #0d9488;
+  /* teal */
 }
 
 .syntax-h1 {
-  color: #b91c1c; /* red-700 */
+  color: #b91c1c;
+  /* red-700 */
   font-weight: bold;
   background-color: #fee2e2;
   border-radius: var(--radius-sm);
@@ -685,7 +727,8 @@ a:hover {
 }
 
 .syntax-h2 {
-  color: #0369a1; /* sky-700 */
+  color: #0369a1;
+  /* sky-700 */
   font-weight: bold;
   background-color: #e0f2fe;
   border-radius: var(--radius-sm);
@@ -693,7 +736,8 @@ a:hover {
 }
 
 .syntax-h3 {
-  color: #0f172a; /* dark slate (formerly green) */
+  color: #0f172a;
+  /* dark slate (formerly green) */
   font-weight: bold;
   background-color: #f1f5f9;
   border-radius: var(--radius-sm);
@@ -701,30 +745,36 @@ a:hover {
 }
 
 .syntax-list-bullet {
-  color: #166534; /* green (formerly orange) */
+  color: #166534;
+  /* green (formerly orange) */
   font-weight: bold;
 }
 
 .syntax-bold {
-  color: #0f172a; /* dark slate */
+  color: #0f172a;
+  /* dark slate */
   font-weight: bold;
 }
 
 .syntax-bold-marker {
-  color: #94a3b8; /* slate-400 */
+  color: #94a3b8;
+  /* slate-400 */
 }
 
 .syntax-link-text {
-  color: #2563eb; /* blue-600 */
+  color: #2563eb;
+  /* blue-600 */
   text-decoration: underline;
 }
 
 .syntax-link-bracket {
-  color: #94a3b8; /* slate-400 */
+  color: #94a3b8;
+  /* slate-400 */
 }
 
 .syntax-link-url {
-  color: #64748b; /* slate-500 */
+  color: #64748b;
+  /* slate-500 */
   font-style: italic;
 }
 
@@ -741,6 +791,42 @@ a:hover {
   align-items: center;
   margin-bottom: 1rem;
   width: 100%;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.recipe-version-wrapper {
+  position: relative;
+}
+
+.version-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  background-color: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  min-width: 240px;
+  max-width: calc(100vw - 2rem);
+  margin-top: 6px;
+  padding: 0.5rem 0;
+}
+
+@media (max-width: 480px) {
+  .recipe-version-wrapper {
+    position: static;
+  }
+
+  .version-dropdown {
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .recipe-back-link {
@@ -753,7 +839,9 @@ a:hover {
   font-size: 0.85rem;
   transition: var(--transition-fast);
   text-decoration: none;
-  padding: 6px 12px;
+  padding: 0 12px;
+  height: 32px;
+  box-sizing: border-box;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
   font-family: var(--font-sans);
@@ -769,12 +857,15 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .recipe-edit-button {
   background: transparent;
   border: 1px solid var(--border-color);
-  padding: 6px 12px;
+  padding: 0 12px;
+  height: 32px;
+  box-sizing: border-box;
   font-size: 0.85rem;
   font-weight: 600;
   border-radius: var(--radius-sm);
@@ -799,6 +890,7 @@ a:hover {
   font-weight: 600;
   line-height: 1.25;
   margin-bottom: 0.75rem;
+  margin-top: 2rem;
   color: var(--text-color);
 }
 
@@ -889,5 +981,3 @@ a:hover {
   margin-bottom: 1rem;
   color: var(--secondary);
 }
-
-
