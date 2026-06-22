@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { RecipeMetadata, RecipeRevision } from '@/lib/recipeStorage';
 import { updateRecipeAction, refineRecipeContentAction } from '@/app/actions';
 import React from 'react';
@@ -234,7 +235,7 @@ export default function RecipeDetailClient({
   }
 
   return (
-    <div>
+    <article className="recipe-container">
       {/* Historical Revision Banner */}
       {currentRev && (
         <div 
@@ -270,206 +271,190 @@ export default function RecipeDetailClient({
         </div>
       )}
 
-      {/* Metadata strip (date, version dropdown trigger, original url) */}
-      <div className="recipe-meta-strip" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
-        <div className="recipe-meta-item">
-          <span>Saved on <strong>{recipe.date}</strong></span>
-        </div>
-
-        {/* Clickable Version Dropdown Trigger */}
-        <div className="recipe-meta-item" style={{ position: 'relative' }}>
-          <span style={{ marginRight: '0.25rem' }}>Version:</span>
-          <button 
-            onClick={() => setShowVersionDropdown(!showVersionDropdown)} 
-            className="version-trigger"
-            style={{
-              background: 'var(--secondary-light)',
-              border: '1px solid var(--border-color)',
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 'bold',
-              color: 'var(--secondary)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            {currentVersionString}
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-            </svg>
-          </button>
-          
-          {showVersionDropdown && (
-            <div 
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                zIndex: 50,
-                backgroundColor: '#fff',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-md)',
-                minWidth: '240px',
-                marginTop: '6px',
-                padding: '0.5rem 0',
-              }}
+      {/* Top Navigation Bar: Back button on the left, Version selector on the right */}
+      <div className="recipe-top-bar">
+        <Link href="/" className="recipe-back-link">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to recipes</span>
+        </Link>
+        
+        <div className="recipe-meta-actions">
+          {/* Edit Button: only show if on latest version */}
+          {!currentRev && (
+            <button 
+              onClick={() => setIsEditing(true)} 
+              className="recipe-edit-button"
             >
-              <div style={{ padding: '0.25rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', marginBottom: '0.25rem', fontWeight: 600 }}>
-                Revision History
-              </div>
-              
-              <button
-                onClick={() => {
-                  setShowVersionDropdown(false);
-                  router.push(`/recipes/${slug}`);
-                }}
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                <path fillRule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+              </svg>
+              Edit
+            </button>
+          )}
+
+          {/* Version Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setShowVersionDropdown(!showVersionDropdown)} 
+              className="recipe-edit-button"
+              style={{ fontWeight: 'bold' }}
+            >
+              v{currentVersionString}
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style={{ marginLeft: '4px' }}>
+                <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+              </svg>
+            </button>
+            
+            {showVersionDropdown && (
+              <div 
                 style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '0.5rem 1rem',
-                  background: !currentRev ? 'var(--secondary-light)' : 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  color: !currentRev ? 'var(--secondary)' : 'var(--text-color)',
-                  fontWeight: !currentRev ? 'bold' : 'normal',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  zIndex: 50,
+                  backgroundColor: '#fff',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-md)',
+                  minWidth: '240px',
+                  marginTop: '6px',
+                  padding: '0.5rem 0',
                 }}
               >
-                <span>Latest version</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{revisions[0]?.versionString || `${recipe.version}.x`}</span>
-              </button>
-
-              {revisions.map((revItem) => (
+                <div style={{ padding: '0.25rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', marginBottom: '0.25rem', fontWeight: 600 }}>
+                  Revision History
+                </div>
+                
                 <button
-                  key={revItem.commitSha}
                   onClick={() => {
                     setShowVersionDropdown(false);
-                    router.push(`/recipes/${slug}?rev=${revItem.commitSha}`);
+                    router.push(`/recipes/${slug}`);
                   }}
                   style={{
                     width: '100%',
                     textAlign: 'left',
                     padding: '0.5rem 1rem',
-                    background: currentRev === revItem.commitSha ? 'var(--secondary-light)' : 'none',
+                    background: !currentRev ? 'var(--secondary-light)' : 'none',
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: '0.9rem',
-                    color: currentRev === revItem.commitSha ? 'var(--secondary)' : 'var(--text-color)',
-                    fontWeight: currentRev === revItem.commitSha ? 'bold' : 'normal',
+                    color: !currentRev ? 'var(--secondary)' : 'var(--text-color)',
+                    fontWeight: !currentRev ? 'bold' : 'normal',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px'
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <span>v{revItem.versionString}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{revItem.date}</span>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                    {revItem.commitMessage}
-                  </span>
+                  <span>Latest version</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{revisions[0]?.versionString || `${recipe.version}.x`}</span>
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {recipe.originalUrl && (
-          <div className="recipe-meta-item">
-            <a 
-              href={recipe.originalUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-            >
-              Original Recipe
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                <path fillRule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/>
-                <path fillRule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/>
-              </svg>
-            </a>
-          </div>
-        )}
-      </div>
-
-      {/* Edit Mode Toggle Button (Only visible on the latest version) */}
-      {!currentRev && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
-          <button onClick={() => setIsEditing(true)} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
-              <path fillRule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
-            </svg>
-            Edit Markdown
-          </button>
-        </div>
-      )}
-
-      <div className="recipe-grid">
-        {/* Ingredients Column */}
-        <aside className="ingredients-box">
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--secondary)' }}>
-            Ingredients
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {recipe.ingredients.map((ing, idx) => (
-              <label key={idx} className="checkbox-item">
-                <input
-                  type="checkbox"
-                  checked={!!checkedIngredients[idx]}
-                  onChange={() => toggleIngredient(idx)}
-                />
-                <span className="checkbox-custom" />
-                <span className="checkbox-text">{ing}</span>
-              </label>
-            ))}
-          </div>
-        </aside>
-
-        {/* Instructions/Steps Column */}
-        <section>
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--secondary)' }}>
-            Instructions
-          </h2>
-          <div className="step-list">
-            {(() => {
-              let stepNumber = 0;
-              return recipe.instructions.map((step, idx) => {
-                if (step.startsWith('### ')) {
-                  const headingText = step.replace('### ', '');
-                  return (
-                    <h3 key={idx} className="step-section-header">
-                      {headingText}
-                    </h3>
-                  );
-                }
-
-                stepNumber++;
-
-                return (
-                  <div
-                    key={idx}
-                    className={`step-card ${completedSteps[idx] ? 'completed' : ''}`}
-                    onClick={() => toggleStep(idx)}
+                {revisions.map((revItem) => (
+                  <button
+                    key={revItem.commitSha}
+                    onClick={() => {
+                      setShowVersionDropdown(false);
+                      router.push(`/recipes/${slug}?rev=${revItem.commitSha}`);
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '0.5rem 1rem',
+                      background: currentRev === revItem.commitSha ? 'var(--secondary-light)' : 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      color: currentRev === revItem.commitSha ? 'var(--secondary)' : 'var(--text-color)',
+                      fontWeight: currentRev === revItem.commitSha ? 'bold' : 'normal',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px'
+                    }}
                   >
-                    <div className="step-number">
-                      {stepNumber}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                      <span>v{revItem.versionString}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{revItem.date}</span>
                     </div>
-                    <div className="step-text">{step}</div>
-                  </div>
-                );
-              });
-            })()}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                      {revItem.commitMessage}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </section>
+        </div>
       </div>
-    </div>
+
+      {/* Recipe Header */}
+      <header style={{ marginBottom: '2.5rem' }}>
+        <h1 className="recipe-title-small">{recipe.title}</h1>
+        {(recipe.description || recipe.originalUrl) && (
+          <p className="recipe-description-simple">
+            {recipe.description}
+            {recipe.originalUrl && (
+              <>
+                {recipe.description ? ' ' : ''}
+                <a 
+                  href={recipe.originalUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="recipe-original-link"
+                >
+                  Original Recipe
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" stroke="currentColor" strokeWidth={1.2} viewBox="0 0 16 16" aria-hidden="true">
+                    <path fillRule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/>
+                    <path fillRule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/>
+                  </svg>
+                </a>
+              </>
+            )}
+          </p>
+        )}
+      </header>
+
+      {/* Ingredients Section */}
+      <section>
+        <h2 className="recipe-section-heading">Ingredients</h2>
+        <ul className="recipe-ingredients-list">
+          {recipe.ingredients.map((ing, idx) => (
+            <li key={idx}>{ing}</li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Preparation Section */}
+      <section>
+        <h2 className="recipe-section-heading">Preparation</h2>
+        <div>
+          {(() => {
+            let stepNumber = 0;
+            return recipe.instructions.map((step, idx) => {
+              if (step.startsWith('### ')) {
+                stepNumber = 0;
+                const headingText = step.replace('### ', '');
+                return (
+                  <h3 key={idx} className="recipe-step-section-heading">
+                    {headingText}
+                  </h3>
+                );
+              }
+
+              stepNumber++;
+
+              return (
+                <div key={idx} className="recipe-step-group">
+                  <h4 className="recipe-step-title">Step {stepNumber}</h4>
+                  <p className="recipe-step-text">{step}</p>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </section>
+    </article>
   );
 }
