@@ -17,7 +17,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'NourishVault - Recipe Parser & Manager',
+  title: 'Recipe App - Recipe Parser & Manager',
   description: 'Instantly scrape recipes from any URL, edit ingredients and instructions, and store them locally in clean Markdown.',
 };
 
@@ -33,7 +33,7 @@ export default function RootLayout({
           <header className="header">
             <div className="header-content">
               <Link href="/" className="logo">
-                Nourish<span>Vault</span>
+                Recipe App
               </Link>
               <NavLinks />
             </div>
@@ -41,9 +41,6 @@ export default function RootLayout({
           <main className="main-content">
             {children}
           </main>
-          <footer className="footer">
-            <p>&copy; {new Date().getFullYear()} NourishVault. Elevating your cooking experience.</p>
-          </footer>
         </div>
       </body>
     </html>

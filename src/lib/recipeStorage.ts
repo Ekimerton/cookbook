@@ -176,7 +176,9 @@ export function parseMarkdownRecipeBody(body: string): { ingredients: string[]; 
     }
     
     if (section === 'ingredients') {
-      if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('+')) {
+      if (trimmed.startsWith('### ')) {
+        ingredients.push(trimmed);
+      } else if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('+')) {
         const item = trimmed.replace(/^[-*+]\s*/, '').trim();
         if (item) ingredients.push(item);
       }

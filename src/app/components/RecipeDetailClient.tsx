@@ -274,30 +274,11 @@ export default function RecipeDetailClient({
         </div>
       )}
 
-      {/* Top Navigation Bar: Back button on the left, Version selector on the right */}
-      <div className="recipe-top-bar">
-        <Link href="/" className="recipe-back-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          <span>Back to recipes</span>
-        </Link>
+      {/* Recipe Header */}
+      <header style={{ marginBottom: '2.5rem' }}>
+        <h1 className="recipe-title-small" style={{ marginBottom: '0.75rem' }}>{recipe.title}</h1>
         
-        <div className="recipe-meta-actions">
-          {/* Edit Button: only show if on latest version */}
-          {isLatest && (
-            <button 
-              onClick={() => setIsEditing(true)} 
-              className="recipe-edit-button"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
-                <path fillRule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
-              </svg>
-              Edit
-            </button>
-          )}
-
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1.25rem', position: 'relative' }}>
           {/* Version Dropdown */}
           <div className="recipe-version-wrapper">
             <button 
@@ -312,7 +293,7 @@ export default function RecipeDetailClient({
             </button>
             
             {showVersionDropdown && (
-              <div className="version-dropdown">
+              <div className="version-dropdown" style={{ left: 0, right: 'auto' }}>
                 <div style={{ padding: '0.25rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', marginBottom: '0.25rem', fontWeight: 600 }}>
                   Revision History
                 </div>
@@ -355,12 +336,22 @@ export default function RecipeDetailClient({
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Recipe Header */}
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 className="recipe-title-small">{recipe.title}</h1>
+          {/* Edit Button: only show if on latest version */}
+          {isLatest && (
+            <button 
+              onClick={() => setIsEditing(true)} 
+              className="recipe-edit-button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                <path fillRule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+              </svg>
+              Edit
+            </button>
+          )}
+        </div>
+
         {(recipe.description || recipe.originalUrl) && (
           <p className="recipe-description-simple">
             {recipe.description}
@@ -389,9 +380,17 @@ export default function RecipeDetailClient({
       <section>
         <h2 className="recipe-section-heading">Ingredients</h2>
         <ul className="recipe-ingredients-list">
-          {recipe.ingredients.map((ing, idx) => (
-            <li key={idx}>{ing}</li>
-          ))}
+          {recipe.ingredients.map((ing, idx) => {
+            if (ing.startsWith('### ')) {
+              const headingText = ing.replace('### ', '');
+              return (
+                <li key={idx} className="recipe-ingredient-section-heading">
+                  {headingText}
+                </li>
+              );
+            }
+            return <li key={idx}>{ing}</li>;
+          })}
         </ul>
       </section>
 

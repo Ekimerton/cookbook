@@ -16,7 +16,7 @@ export async function generateMetadata({ params, searchParams }: RecipePageProps
     return { title: 'Recipe Not Found' };
   }
   return {
-    title: `${recipeFile.metadata.title} - NourishVault`,
+    title: `${recipeFile.metadata.title} - Recipe App`,
     description: recipeFile.metadata.description || `View ingredients and steps for ${recipeFile.metadata.title}.`,
   };
 }
