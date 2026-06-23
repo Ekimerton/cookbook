@@ -1,6 +1,6 @@
 'use server';
 
-import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini, withRetry } from '@/lib/recipeParser';
+import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini, withRetry, getYoutubeVideoId, parseTimeToSeconds, getYoutubeTranscript, parseYoutubeTranscriptWithGemini } from '@/lib/recipeParser';
 import { saveRecipe, RecipeMetadata, updateRecipe } from '@/lib/recipeStorage';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
@@ -69,6 +69,99 @@ export async function extractRecipeFromContentAction(content: string, url: strin
     return { 
       success: false, 
       error: error.message || 'Failed to extract recipe details from the pasted content.' 
+    };
+  }
+}
+
+export async function extractRecipeFromYoutubeAction(
+  youtubeUrl: string,
+  startTimeStr?: string,
+  endTimeStr?: string
+) {
+  try {
+    if (!youtubeUrl || typeof youtubeUrl !== 'string') {
+      return { success: false, error: 'Please enter a valid YouTube URL.' };
+    }
+
+    const videoId = getYoutubeVideoId(youtubeUrl);
+    if (!videoId) {
+      return { success: false, error: 'Could not parse a valid YouTube Video ID from the URL.' };
+    }
+
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      return { 
+        success: false, 
+        error: 'Gemini API Key is not configured. Please add your GEMINI_API_KEY in user-settings.json to enable YouTube extraction.' 
+      };
+    }
+
+    // 1. Fetch transcript segments
+    const segments = await getYoutubeTranscript(videoId);
+
+    // 2. Parse start and end times
+    const startTime = startTimeStr ? parseTimeToSeconds(startTimeStr) : null;
+    const endTime = endTimeStr ? parseTimeToSeconds(endTimeStr) : null;
+
+    // Validate times if provided
+    if (startTimeStr && startTime === null) {
+      return { success: false, error: `Invalid start time format: "${startTimeStr}". Use e.g. 1:30 or 90s.` };
+    }
+    if (endTimeStr && endTime === null) {
+      return { success: false, error: `Invalid end time format: "${endTimeStr}". Use e.g. 5:00 or 300s.` };
+    }
+
+    // 3. Filter segments
+    let filteredSegments = segments;
+    if (startTime !== null || endTime !== null) {
+      filteredSegments = segments.filter(seg => {
+        const start = seg.start;
+        const end = seg.start + seg.duration;
+        
+        if (startTime !== null && end < startTime) return false;
+        if (endTime !== null && start > endTime) return false;
+        return true;
+      });
+    }
+
+    if (filteredSegments.length === 0) {
+      return { 
+        success: false, 
+        error: 'No transcript segments found within the specified time range.' 
+      };
+    }
+
+    // 4. Format transcript
+    const transcriptText = filteredSegments.map(seg => {
+      const mm = Math.floor(seg.start / 60);
+      const ss = Math.floor(seg.start % 60).toString().padStart(2, '0');
+      return `[${mm}:${ss}] ${seg.text}`;
+    }).join('\n');
+
+    // 5. Send to Gemini for recipe extraction
+    // Ensure the original URL includes the timestamp query params if they were specified
+    let targetUrl = youtubeUrl.trim();
+    if (startTime !== null) {
+      try {
+        const urlObj = new URL(targetUrl);
+        urlObj.searchParams.set('t', `${startTime}s`);
+        targetUrl = urlObj.toString();
+      } catch (e) {
+        if (targetUrl.includes('?')) {
+          targetUrl = `${targetUrl}&t=${startTime}s`;
+        } else {
+          targetUrl = `${targetUrl}?t=${startTime}s`;
+        }
+      }
+    }
+
+    const recipe = await parseYoutubeTranscriptWithGemini(transcriptText, targetUrl, apiKey);
+    return { success: true, data: recipe };
+  } catch (error: any) {
+    console.error('Error extracting recipe from YouTube:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Unable to extract recipe from this YouTube video. You can still enter details manually.' 
     };
   }
 }

@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { GoogleGenAI } from '@google/genai';
+import { YoutubeTranscript } from 'youtube-transcript';
 import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
@@ -392,6 +393,136 @@ function getGeminiApiKeyLocal(): string | undefined {
     console.error('Failed to read user-settings.json:', e);
   }
   return apiKey;
+}
+
+export function getYoutubeVideoId(url: string): string | null {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
+
+export function parseTimeToSeconds(timeStr: string): number | null {
+  if (!timeStr) return null;
+  const cleaned = timeStr.trim().toLowerCase();
+  
+  // If it's just digits with an optional 's' at the end (e.g. 90 or 90s)
+  if (/^\d+s?$/.test(cleaned)) {
+    return parseInt(cleaned.replace('s', ''), 10);
+  }
+  
+  // HH:MM:SS or MM:SS format
+  const parts = cleaned.split(':');
+  if (parts.length === 2) {
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseInt(parts[1], 10);
+    if (!isNaN(minutes) && !isNaN(seconds)) {
+      return minutes * 60 + seconds;
+    }
+  } else if (parts.length === 3) {
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = parseInt(parts[2], 10);
+    if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+  }
+  
+  return null;
+}
+
+export interface TranscriptSegment {
+  text: string;
+  start: number; // in seconds
+  duration: number; // in seconds
+}
+
+export async function getYoutubeTranscript(videoId: string): Promise<TranscriptSegment[]> {
+  try {
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    return transcript.map(t => ({
+      text: t.text
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim(),
+      start: t.offset / 1000,
+      duration: t.duration / 1000
+    }));
+  } catch (err: any) {
+    console.error('Error fetching transcript via youtube-transcript:', err);
+    throw new Error(err.message || 'Transcripts are disabled or not available for this YouTube video.');
+  }
+}
+
+export async function parseYoutubeTranscriptWithGemini(
+  transcriptText: string,
+  url: string,
+  apiKey: string
+): Promise<ExtractedRecipe> {
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const response = await withRetry(() => ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: [
+      {
+        text: `You are an expert culinary scraper and editor. Extract the recipe details from the provided YouTube video transcript. 
+The transcript contains timestamp markers in the format [MM:SS] and represents spoken dialogue, which can be conversational, informal, and contains digressions or multiple dishes.
+
+CRITICAL INSTRUCTIONS:
+1. Zero in on ONE main recipe discussed in this transcript.
+2. Extract the ingredients (with quantities and names) and step-by-step instructions.
+3. Clean up the language to be professional, clear, and structured recipe text.
+4. If the instructions are divided into parts/sections, prefix the section headers with "### " (e.g. "### For the sauce") inside the instructions list.
+5. You MUST use the following reference template structure for the JSON output:
+
+Reference Template:
+${JSON.stringify(TEMPLATE_RECIPE_JSON, null, 2)}
+
+YouTube URL Reference: ${url}
+YouTube Video Transcript:
+${transcriptText}`
+      }
+    ],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'The title/name of the recipe' },
+          description: { type: 'string', description: 'A short summary/description of the recipe' },
+          ingredients: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'List of ingredients with quantities and names'
+          },
+          instructions: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'List of instruction steps. Use "### Section Name" for section headings if instructions are divided into parts.'
+          }
+        },
+        required: ['title', 'ingredients', 'instructions']
+      }
+    }
+  }));
+
+  if (!response.text) {
+    throw new Error('Gemini returned an empty response.');
+  }
+
+  const parsed = JSON.parse(response.text);
+  
+  return {
+    title: parsed.title || 'Untitled YouTube Recipe',
+    description: parsed.description || '',
+    ingredients: parsed.ingredients || [],
+    instructions: parsed.instructions || [],
+    originalUrl: url
+  };
 }
 
 // Scrape and parse the webpage using a multi-layered fallback pipeline

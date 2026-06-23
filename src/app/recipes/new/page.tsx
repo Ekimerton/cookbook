@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { extractRecipeAction, saveRecipeAction, extractRecipeFromContentAction } from '@/app/actions';
+import { extractRecipeAction, saveRecipeAction, extractRecipeFromContentAction, extractRecipeFromYoutubeAction } from '@/app/actions';
 import { ExtractedRecipe } from '@/lib/recipeParser';
 
 export default function NewRecipePage() {
@@ -10,6 +10,9 @@ export default function NewRecipePage() {
   
   // Scraper states
   const [url, setUrl] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [youtubeStartTime, setYoutubeStartTime] = useState('');
+  const [youtubeEndTime, setYoutubeEndTime] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   
@@ -111,6 +114,50 @@ export default function NewRecipePage() {
     }
   };
 
+  const handleExtractYoutube = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!youtubeUrl.trim()) return;
+
+    setIsExtracting(true);
+    setExtractError(null);
+    let keepSpinner = false;
+
+    try {
+      const result = await extractRecipeFromYoutubeAction(
+        youtubeUrl,
+        youtubeStartTime.trim() || undefined,
+        youtubeEndTime.trim() || undefined
+      );
+
+      if (result.success && result.data) {
+        const extracted = result.data;
+        
+        if (extracted.ingredients.length === 0 && extracted.instructions.length === 0) {
+          throw new Error('We could not extract any ingredients or instructions from this YouTube video transcript. You can still add it manually.');
+        }
+
+        // Save immediately!
+        const saveResult = await saveRecipeAction(extracted);
+        if (saveResult.success && saveResult.slug) {
+          keepSpinner = true;
+          // Take them directly to the recipe page
+          router.push(`/recipes/${saveResult.slug}`);
+          return; // Skip setting isExtracting to false to keep spinner active during redirect transition
+        } else {
+          setExtractError(saveResult.error || 'Failed to save the extracted recipe.');
+        }
+      } else {
+        setExtractError(result.error || 'Failed to extract recipe.');
+      }
+    } catch (err: any) {
+      setExtractError(err.message || 'An unexpected error occurred during YouTube extraction.');
+    } finally {
+      if (!keepSpinner) {
+        setIsExtracting(false);
+      }
+    }
+  };
+
   // Skip scraping and create manually
   const handleCreateManually = () => {
     setRecipe({
@@ -174,22 +221,13 @@ export default function NewRecipePage() {
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div className="recipe-header text-center">
-        <h1 className="recipe-title" style={{ fontSize: '3rem' }}>
-          Add a New Recipe
-        </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          Enter a web link to scrape its details, or fill them in yourself.
-        </p>
-      </div>
-
+    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
       {viewState === 'url_input' ? (
-        <div className="card">
-          <form onSubmit={handleExtract}>
-            <div className="form-group">
-              <label htmlFor="recipe-url" className="form-label">
-                Recipe Website URL
+        <div style={{ marginTop: '0.5rem' }}>
+          <form onSubmit={handleExtract} style={{ marginBottom: '1.75rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="recipe-url" className="form-label" style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', display: 'block', color: 'var(--secondary)' }}>
+                New Recipe from URL
               </label>
               <input
                 id="recipe-url"
@@ -201,66 +239,132 @@ export default function NewRecipePage() {
                 required
                 disabled={isExtracting}
               />
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                We will attempt to automatically pull the ingredients, steps, and details from the page.
-              </p>
             </div>
 
-            {extractError && (
-              <div 
-                style={{ 
-                  backgroundColor: 'var(--primary-light)', 
-                  borderLeft: '4px solid var(--primary)', 
-                  padding: '1rem', 
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '1.5rem',
-                  fontSize: '0.9rem',
-                  color: 'var(--text-color)'
-                }}
-              >
-                <strong>Scraping Alert:</strong> {extractError}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ flex: 1 }}
-                disabled={isExtracting}
-              >
-                {isExtracting ? (
-                  <>
-                    <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
-                    Extracting Recipe...
-                  </>
-                ) : (
-                  'Extract Recipe'
-                )}
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-outline" 
-                onClick={handleCreateManually}
-                disabled={isExtracting}
-              >
-                Write Manually
-              </button>
-            </div>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ width: '100%', marginTop: '0.75rem' }}
+              disabled={isExtracting}
+            >
+              {isExtracting && !youtubeUrl ? (
+                <>
+                  <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
+                  Extracting Recipe...
+                </>
+              ) : (
+                'Extract Recipe'
+              )}
+            </button>
           </form>
+
+          <form onSubmit={handleExtractYoutube} style={{ marginBottom: '1.25rem' }}>
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label htmlFor="youtube-url" className="form-label" style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', display: 'block', color: 'var(--secondary)' }}>
+                New Recipe from YouTube
+              </label>
+              <input
+                id="youtube-url"
+                type="text"
+                className="form-input"
+                placeholder="https://www.youtube.com/watch?v=... or YouTube Shorts link"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                required
+                disabled={isExtracting}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: 0 }}>
+              <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                <label htmlFor="youtube-start-time" className="form-label" style={{ fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                  Start Time (Optional)
+                </label>
+                <input
+                  id="youtube-start-time"
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 1:30 or 90s"
+                  value={youtubeStartTime}
+                  onChange={(e) => setYoutubeStartTime(e.target.value)}
+                  disabled={isExtracting}
+                  style={{ padding: '0.6rem 0.8rem', fontSize: '0.95rem' }}
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                <label htmlFor="youtube-end-time" className="form-label" style={{ fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                  End Time (Optional)
+                </label>
+                <input
+                  id="youtube-end-time"
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 5:00 or 300s"
+                  value={youtubeEndTime}
+                  onChange={(e) => setYoutubeEndTime(e.target.value)}
+                  disabled={isExtracting}
+                  style={{ padding: '0.6rem 0.8rem', fontSize: '0.95rem' }}
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ width: '100%', marginTop: '0.75rem' }}
+              disabled={isExtracting}
+            >
+              {isExtracting && youtubeUrl ? (
+                <>
+                  <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
+                  Extracting YouTube...
+                </>
+              ) : (
+                'Extract Recipe'
+              )}
+            </button>
+          </form>
+
+          {extractError && (
+            <div 
+              style={{ 
+                backgroundColor: 'var(--primary-light)', 
+                borderLeft: '4px solid var(--primary)', 
+                padding: '1rem', 
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1.25rem',
+                fontSize: '0.9rem',
+                color: 'var(--text-color)'
+              }}
+            >
+              <strong>Scraping Alert:</strong> {extractError}
+            </div>
+          )}
+
+          <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+            <button 
+              type="button" 
+              className="btn btn-outline" 
+              onClick={handleCreateManually}
+              disabled={isExtracting}
+              style={{ width: '100%' }}
+            >
+              Write Manually
+            </button>
+          </div>
 
           {/* Copy-paste bypass section */}
           {(extractError || showPasteBox) && (
-            <div style={{ margin: '2rem 0 0 0', borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
-              <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', color: 'var(--primary)' }}>
+            <div style={{ margin: '1.5rem 0 0 0', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.35rem', fontFamily: 'var(--font-sans)', color: 'var(--primary)' }}>
                 Bypass Scraper Block with Copy-Paste
               </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                 Recipe websites often block server requests (like 403 Forbidden). To bypass this, open the recipe page in your browser, select and copy everything (Ctrl+A / Cmd+A), paste it below, and Gemini will extract the details!
               </p>
               
               <form onSubmit={handleExtractPaste}>
-                <div className="form-group">
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
                   <textarea
                     className="form-input"
                     rows={6}
@@ -292,7 +396,7 @@ export default function NewRecipePage() {
           )}
 
           {!extractError && !showPasteBox && (
-            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+            <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
               <button
                 type="button"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)', textDecoration: 'underline' }}
@@ -304,7 +408,10 @@ export default function NewRecipePage() {
           )}
         </div>
       ) : (
-        <div className="card">
+        <div style={{ marginTop: '0.5rem' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '1rem', fontFamily: 'var(--font-sans)', color: 'var(--secondary)' }}>
+            New Recipe Details
+          </h2>
           <form onSubmit={handleSaveRecipe}>
             <div className="form-group">
               <label htmlFor="title" className="form-label">Recipe Title *</label>
@@ -329,8 +436,6 @@ export default function NewRecipePage() {
                 style={{ resize: 'vertical' }}
               />
             </div>
-
-
 
             <div className="form-group">
               <label htmlFor="ingredients" className="form-label">Ingredients (one per line) *</label>
