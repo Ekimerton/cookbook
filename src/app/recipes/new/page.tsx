@@ -18,13 +18,13 @@ const MarkdownEditor = dynamic(
 );
 
 const DEFAULT_MARKDOWN_TEMPLATE = `---
-title: "New Recipe"
 originalUrl: "Manual Entry"
-description: ""
 version: 1
 ---
 
 # New Recipe
+
+Describe the recipe here.
 
 ## Ingredients
 
@@ -205,12 +205,8 @@ export default function NewRecipePage() {
 
   // Helper to serialize ExtractedRecipe object to markdown template format
   const formatExtractedToMarkdown = (ext: ExtractedRecipe) => {
-    const dateStr = new Date().toISOString().split('T')[0];
     const frontmatter = `---
-title: "${ext.title || 'New Recipe'}"
 originalUrl: "${ext.originalUrl || 'Manual Entry'}"
-date: "${dateStr}"
-description: "${(ext.description || '').replace(/"/g, '\\"')}"
 version: 1
 ---`;
 

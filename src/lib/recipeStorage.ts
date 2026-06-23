@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { GoogleGenAI } from '@google/genai';
 
 export interface RecipeMetadata {
@@ -130,8 +130,8 @@ ${diff}`
     } else {
       console.log('Git: No remote configured. Skipping push.');
     }
-  } catch (err: any) {
-    console.error('Git integration error (non-fatal):', err.message || err);
+  } catch (err: unknown) {
+    console.error('Git integration error (non-fatal):', err instanceof Error ? err.message : err);
   }
 }
 
@@ -148,6 +148,89 @@ export function slugify(text: string): string {
     .replace(/-+/g, '-')
     .replace(/^-+/, '')
     .replace(/-+$/, '');
+}
+
+// Get the recipe file's date from Git.
+// If commitSha is provided, return that specific commit's date.
+// If not, return the oldest commit date (creation date) of the file.
+// Fall back to filesystem birthtime or current date.
+export function getFileGitDate(filename: string, commitSha?: string): string {
+  try {
+    if (commitSha) {
+      const result = spawnSync('git', ['show', '-s', '--format=%aI', commitSha], {
+        cwd: RECIPES_DIR,
+      });
+      if (result.status === 0) {
+        const output = result.stdout?.toString().trim();
+        if (output) {
+          return new Date(output).toISOString().split('T')[0];
+        }
+      }
+    } else {
+      const result = spawnSync('git', ['log', '--follow', '--format=%aI', '--', filename], {
+        cwd: RECIPES_DIR,
+      });
+      if (result.status === 0) {
+        const output = result.stdout?.toString().trim();
+        if (output) {
+          const dates = output.split('\n').filter(Boolean);
+          const oldestDate = dates[dates.length - 1];
+          if (oldestDate) {
+            return new Date(oldestDate).toISOString().split('T')[0];
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Failed to get git date for ${filename}:`, err);
+  }
+
+  try {
+    const stats = fs.statSync(path.join(RECIPES_DIR, filename));
+    return stats.birthtime.toISOString().split('T')[0];
+  } catch {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+// Extract title and description from the markdown body
+export function parseMarkdownRecipeBodyFields(body: string): { title: string; description: string } {
+  const lines = body.split('\n');
+  let title = '';
+  const descriptionLines: string[] = [];
+  let foundTitle = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (trimmed.startsWith('# ')) {
+      title = trimmed.slice(2).trim();
+      foundTitle = true;
+      continue;
+    }
+
+    if (foundTitle) {
+      // If we hit any other markdown elements like header, lists, blockquotes, horizontal rules, etc., stop parsing description
+      if (
+        trimmed.startsWith('#') ||
+        trimmed.startsWith('-') ||
+        trimmed.startsWith('*') ||
+        trimmed.startsWith('+') ||
+        /^\d+\./.test(trimmed)
+      ) {
+        break;
+      }
+      descriptionLines.push(trimmed);
+    }
+  }
+
+  return {
+    title: title || 'Untitled Recipe',
+    description: descriptionLines.join(' ').trim(),
+  };
 }
 
 // Parse recipe ingredients and instructions directly from the Markdown body content
@@ -211,14 +294,9 @@ export function saveRecipe(recipe: Omit<RecipeMetadata, 'date' | 'version'>): st
     counter++;
   }
 
-  const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  
-  // Clean frontmatter with ONLY permitted keys
+  // Clean frontmatter with ONLY permitted keys (only originalUrl and version)
   const frontmatter = {
-    title: recipe.title,
     originalUrl: recipe.originalUrl,
-    date: dateStr,
-    description: recipe.description || '',
     version: 1
   };
 
@@ -272,13 +350,15 @@ export function getAllRecipes(): (RecipeMetadata & { slug: string })[] {
       const fileContent = fs.readFileSync(filePath, 'utf-8');
       const { data, content } = matter(fileContent);
       const parsedBody = parseMarkdownRecipeBody(content);
+      const { title, description } = parseMarkdownRecipeBodyFields(content);
+      const date = getFileGitDate(file);
       
       return {
         slug,
-        title: data.title || '',
+        title: title || data.title || '',
         originalUrl: data.originalUrl || '',
-        date: data.date || '',
-        description: data.description || '',
+        date: date || data.date || '',
+        description: description || data.description || '',
         version: data.version || 1,
         ingredients: parsedBody.ingredients,
         instructions: parsedBody.instructions,
@@ -303,7 +383,6 @@ export function getRecipeBySlug(slug: string, commitSha?: string): RecipeFile | 
   let fileContent = '';
   if (commitSha) {
     try {
-      const { spawnSync } = require('child_process');
       const showResult = spawnSync('git', ['show', `${commitSha}:${slug}.md`], {
         cwd: RECIPES_DIR,
       });
@@ -323,12 +402,14 @@ export function getRecipeBySlug(slug: string, commitSha?: string): RecipeFile | 
 
   const { data, content } = matter(fileContent);
   const parsedBody = parseMarkdownRecipeBody(content);
+  const { title, description } = parseMarkdownRecipeBodyFields(content);
+  const date = getFileGitDate(`${slug}.md`, commitSha);
 
   const metadata: RecipeMetadata = {
-    title: data.title || '',
+    title: title || data.title || '',
     originalUrl: data.originalUrl || '',
-    date: data.date || '',
-    description: data.description || '',
+    date: date || data.date || '',
+    description: description || data.description || '',
     version: data.version || 1,
     ingredients: parsedBody.ingredients,
     instructions: parsedBody.instructions,
@@ -352,7 +433,6 @@ export function getRecipeRevisions(slug: string): RecipeRevision[] {
   }
 
   try {
-    const { spawnSync } = require('child_process');
     const result = spawnSync('git', ['log', '--follow', '--format=%H|%aI|%s', '--', filename], {
       cwd: RECIPES_DIR,
     });
@@ -425,9 +505,9 @@ export function saveNewRecipeFromMarkdown(rawContent: string): { success: boolea
     return { success: false, error: `Invalid YAML frontmatter: ${(err as Error).message}` };
   }
 
-  const title = parsed.data.title;
-  if (!title || typeof title !== 'string' || !title.trim()) {
-    return { success: false, error: 'A recipe title is required in the frontmatter.' };
+  const { title } = parseMarkdownRecipeBodyFields(parsed.content);
+  if (!title || !title.trim() || title === 'Untitled Recipe') {
+    return { success: false, error: 'A recipe title is required (e.g. "# Recipe Title") in the markdown body.' };
   }
 
   const slugBase = slugify(title) || 'recipe';
@@ -442,13 +522,8 @@ export function saveNewRecipeFromMarkdown(rawContent: string): { success: boolea
     counter++;
   }
 
-  const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  
   const updatedData = {
-    title: title.trim(),
     originalUrl: parsed.data.originalUrl || 'Manual Entry',
-    date: parsed.data.date || dateStr,
-    description: parsed.data.description || '',
     version: parsed.data.version || 1
   };
   
@@ -456,7 +531,7 @@ export function saveNewRecipeFromMarkdown(rawContent: string): { success: boolea
   fs.writeFileSync(filePath, fileContent, 'utf-8');
 
   // Trigger Git operations in the background
-  gitCommitAndPushRecipe(`${slug}.md`, updatedData.title);
+  gitCommitAndPushRecipe(`${slug}.md`, title.trim());
 
   return { success: true, slug };
 }
@@ -475,11 +550,20 @@ export function updateRecipe(slug: string, rawContent: string): { success: boole
     return { success: false, error: `Invalid YAML frontmatter: ${(err as Error).message}` };
   }
 
-  const title = parsed.data.title || slug;
-  fs.writeFileSync(filePath, rawContent, 'utf-8');
+  const { title } = parseMarkdownRecipeBodyFields(parsed.content);
+  const displayTitle = title || parsed.data.title || slug;
+  
+  // Clean frontmatter to keep only originalUrl and version
+  const cleanData = {
+    originalUrl: parsed.data.originalUrl || 'Manual Entry',
+    version: parsed.data.version || 1
+  };
+
+  const fileContent = matter.stringify(parsed.content, cleanData);
+  fs.writeFileSync(filePath, fileContent, 'utf-8');
 
   // Trigger git update in the background (isUpdate = true)
-  gitCommitAndPushRecipe(`${slug}.md`, title, true);
+  gitCommitAndPushRecipe(`${slug}.md`, displayTitle, true);
 
   return { success: true };
 }

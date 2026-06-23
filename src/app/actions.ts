@@ -261,7 +261,7 @@ Apply the requested changes to the recipe content and output the entire modified
 
 CRITICAL INSTRUCTIONS:
 1. Output the entire markdown file, including the unchanged parts.
-2. Maintain the YAML frontmatter format (title, originalUrl, date, description, version) exactly.
+2. Maintain the YAML frontmatter format (originalUrl, version) exactly. The recipe title and description live in the markdown body (e.g. '# Title' and the paragraphs under it). Do NOT add 'title', 'description', or 'date' to the YAML frontmatter.
 3. Do NOT wrap your output in triple backticks (e.g. \`\`\`markdown or \`\`\`yaml). Return the raw text directly.
 4. Do NOT include any conversational filler, notes, or intros/outros. Return ONLY the raw modified markdown file.
 5. If the request is invalid or cannot be fulfilled, return the original raw content exactly.

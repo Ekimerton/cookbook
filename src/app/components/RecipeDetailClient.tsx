@@ -400,27 +400,29 @@ export default function RecipeDetailClient({
         <h2 className="recipe-section-heading">Preparation</h2>
         <div>
           {(() => {
+            const elements = [];
             let stepNumber = 0;
-            return recipe.instructions.map((step, idx) => {
+            for (let idx = 0; idx < recipe.instructions.length; idx++) {
+              const step = recipe.instructions[idx];
               if (step.startsWith('### ')) {
                 stepNumber = 0;
                 const headingText = step.replace('### ', '');
-                return (
+                elements.push(
                   <h3 key={idx} className="recipe-step-section-heading">
                     {headingText}
                   </h3>
                 );
+              } else {
+                stepNumber++;
+                elements.push(
+                  <div key={idx} className="recipe-step-group">
+                    <h4 className="recipe-step-title">Step {stepNumber}</h4>
+                    <p className="recipe-step-text">{step}</p>
+                  </div>
+                );
               }
-
-              stepNumber++;
-
-              return (
-                <div key={idx} className="recipe-step-group">
-                  <h4 className="recipe-step-title">Step {stepNumber}</h4>
-                  <p className="recipe-step-text">{step}</p>
-                </div>
-              );
-            });
+            }
+            return elements;
           })()}
         </div>
       </section>
