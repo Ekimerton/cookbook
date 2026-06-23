@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { 
   extractRecipeAction, 
-  extractRecipeFromContentAction, 
   extractRecipeFromYoutubeAction,
   saveNewRecipeMarkdownAction
 } from '@/app/actions';
@@ -55,9 +54,7 @@ export default function NewRecipePage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   
-  // Copy-paste states
-  const [pasteContent, setPasteContent] = useState('');
-  const [showPasteBox, setShowPasteBox] = useState(false);
+
 
   const handleSaveRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +86,6 @@ export default function NewRecipePage() {
 
     setIsExtracting(true);
     setExtractError(null);
-    let keepSpinner = false;
 
     try {
       const result = await extractRecipeAction(url);
@@ -99,66 +95,20 @@ export default function NewRecipePage() {
           throw new Error('We could not extract any ingredients or instructions from this page. You can still add it manually.');
         }
 
-        // Save immediately!
-        const saveResult = await saveNewRecipeMarkdownAction(
-          formatExtractedToMarkdown(extracted)
-        );
-        if (saveResult.success && saveResult.slug) {
-          keepSpinner = true;
-          router.push(`/recipes/${saveResult.slug}`);
-          return;
-        } else {
-          setExtractError(saveResult.error || 'Failed to save the extracted recipe.');
-        }
+        const md = formatExtractedToMarkdown(extracted);
+        setMarkdownContent(md);
+        setViewState('editor');
       } else {
         setExtractError(result.error || 'Failed to extract recipe.');
       }
     } catch (err: unknown) {
       setExtractError((err as Error).message || 'An unexpected error occurred during extraction.');
     } finally {
-      if (!keepSpinner) {
-        setIsExtracting(false);
-      }
+      setIsExtracting(false);
     }
   };
 
-  const handleExtractPaste = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pasteContent.trim()) return;
 
-    setIsExtracting(true);
-    setExtractError(null);
-    let keepSpinner = false;
-
-    try {
-      const result = await extractRecipeFromContentAction(pasteContent, url);
-      if (result.success && result.data) {
-        const extracted = result.data;
-        if (extracted.ingredients.length === 0 && extracted.instructions.length === 0) {
-          throw new Error('We could not extract any ingredients or instructions from the pasted content.');
-        }
-
-        const saveResult = await saveNewRecipeMarkdownAction(
-          formatExtractedToMarkdown(extracted)
-        );
-        if (saveResult.success && saveResult.slug) {
-          keepSpinner = true;
-          router.push(`/recipes/${saveResult.slug}`);
-          return;
-        } else {
-          setExtractError(saveResult.error || 'Failed to save the extracted recipe.');
-        }
-      } else {
-        setExtractError(result.error || 'Failed to parse the pasted content.');
-      }
-    } catch (err: unknown) {
-      setExtractError((err as Error).message || 'An unexpected error occurred during copy-paste extraction.');
-    } finally {
-      if (!keepSpinner) {
-        setIsExtracting(false);
-      }
-    }
-  };
 
   const handleExtractYoutube = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,7 +116,6 @@ export default function NewRecipePage() {
 
     setIsExtracting(true);
     setExtractError(null);
-    let keepSpinner = false;
 
     try {
       const result = await extractRecipeFromYoutubeAction(
@@ -181,25 +130,16 @@ export default function NewRecipePage() {
           throw new Error('We could not extract any ingredients or instructions from this YouTube video transcript. You can still add it manually.');
         }
 
-        const saveResult = await saveNewRecipeMarkdownAction(
-          formatExtractedToMarkdown(extracted)
-        );
-        if (saveResult.success && saveResult.slug) {
-          keepSpinner = true;
-          router.push(`/recipes/${saveResult.slug}`);
-          return;
-        } else {
-          setExtractError(saveResult.error || 'Failed to save the extracted recipe.');
-        }
+        const md = formatExtractedToMarkdown(extracted);
+        setMarkdownContent(md);
+        setViewState('editor');
       } else {
         setExtractError(result.error || 'Failed to extract recipe.');
       }
     } catch (err: unknown) {
       setExtractError((err as Error).message || 'An unexpected error occurred during YouTube extraction.');
     } finally {
-      if (!keepSpinner) {
-        setIsExtracting(false);
-      }
+      setIsExtracting(false);
     }
   };
 
@@ -282,7 +222,7 @@ ${stepsMarkdown}
               style={{ width: '100%', marginTop: '0.75rem' }}
               disabled={isExtracting}
             >
-              {isExtracting && !youtubeUrl && !pasteContent ? (
+              {isExtracting && !youtubeUrl ? (
                 <>
                   <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
                   Extracting Recipe...
@@ -292,6 +232,8 @@ ${stepsMarkdown}
               )}
             </button>
           </form>
+
+
 
           <form onSubmit={handleExtractYoutube} style={{ marginBottom: 0 }}>
             <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -359,59 +301,6 @@ ${stepsMarkdown}
               )}
             </button>
           </form>
-
-          {/* Copy-paste bypass section */}
-          {(extractError || showPasteBox) ? (
-            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.35rem', fontFamily: 'var(--font-sans)', color: 'var(--primary)' }}>
-                Bypass Scraper Block with Copy-Paste
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Recipe websites often block server requests (like 403 Forbidden). To bypass this, open the recipe page in your browser, select and copy everything (Ctrl+A / Cmd+A), paste it below, and Gemini will extract the details!
-              </p>
-              
-              <form onSubmit={handleExtractPaste}>
-                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <textarea
-                    className="form-input"
-                    rows={6}
-                    placeholder="Paste webpage text content or raw HTML here..."
-                    value={pasteContent}
-                    onChange={(e) => setPasteContent(e.target.value)}
-                    disabled={isExtracting}
-                    required
-                    style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '0.9rem' }}
-                  />
-                </div>
-                
-                <button
-                  type="submit"
-                  className="btn btn-secondary"
-                  style={{ width: '100%' }}
-                  disabled={isExtracting || !pasteContent.trim()}
-                >
-                  {isExtracting && pasteContent ? (
-                    <>
-                      <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
-                      Extracting Paste...
-                    </>
-                  ) : (
-                    'Extract & Save Pasted Content'
-                  )}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-              <button
-                type="button"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)', textDecoration: 'underline' }}
-                onClick={() => setShowPasteBox(true)}
-              >
-                Or parse via copy-pasted text/HTML
-              </button>
-            </div>
-          )}
 
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginTop: '1rem' }}>
             <button 
