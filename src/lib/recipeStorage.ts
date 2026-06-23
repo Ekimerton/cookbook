@@ -415,6 +415,52 @@ export function getRecipeRevisions(slug: string): RecipeRevision[] {
   }
 }
 
+export function saveNewRecipeFromMarkdown(rawContent: string): { success: boolean; slug?: string; error?: string } {
+  ensureRecipesDir();
+
+  let parsed: ReturnType<typeof matter>;
+  try {
+    parsed = matter(rawContent);
+  } catch (err: unknown) {
+    return { success: false, error: `Invalid YAML frontmatter: ${(err as Error).message}` };
+  }
+
+  const title = parsed.data.title;
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return { success: false, error: 'A recipe title is required in the frontmatter.' };
+  }
+
+  const slugBase = slugify(title) || 'recipe';
+  let slug = slugBase;
+  let filePath = path.join(RECIPES_DIR, `${slug}.md`);
+  let counter = 1;
+
+  // Resolve duplicate slug names
+  while (fs.existsSync(filePath)) {
+    slug = `${slugBase}-${counter}`;
+    filePath = path.join(RECIPES_DIR, `${slug}.md`);
+    counter++;
+  }
+
+  const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  const updatedData = {
+    title: title.trim(),
+    originalUrl: parsed.data.originalUrl || 'Manual Entry',
+    date: parsed.data.date || dateStr,
+    description: parsed.data.description || '',
+    version: parsed.data.version || 1
+  };
+  
+  const fileContent = matter.stringify(parsed.content, updatedData);
+  fs.writeFileSync(filePath, fileContent, 'utf-8');
+
+  // Trigger Git operations in the background
+  gitCommitAndPushRecipe(`${slug}.md`, updatedData.title);
+
+  return { success: true, slug };
+}
+
 export function updateRecipe(slug: string, rawContent: string): { success: boolean; error?: string } {
   ensureRecipesDir();
   const filePath = path.join(RECIPES_DIR, `${slug}.md`);
@@ -422,11 +468,11 @@ export function updateRecipe(slug: string, rawContent: string): { success: boole
     return { success: false, error: 'Recipe file does not exist.' };
   }
 
-  let parsed: any;
+  let parsed: ReturnType<typeof matter>;
   try {
     parsed = matter(rawContent);
-  } catch (err: any) {
-    return { success: false, error: `Invalid YAML frontmatter: ${err.message}` };
+  } catch (err: unknown) {
+    return { success: false, error: `Invalid YAML frontmatter: ${(err as Error).message}` };
   }
 
   const title = parsed.data.title || slug;
@@ -437,3 +483,4 @@ export function updateRecipe(slug: string, rawContent: string): { success: boole
 
   return { success: true };
 }
+

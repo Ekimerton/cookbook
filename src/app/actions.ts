@@ -1,7 +1,7 @@
 'use server';
 
 import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini, withRetry, getYoutubeVideoId, parseTimeToSeconds, getYoutubeTranscript, parseYoutubeTranscriptWithGemini } from '@/lib/recipeParser';
-import { saveRecipe, RecipeMetadata, updateRecipe } from '@/lib/recipeStorage';
+import { saveRecipe, RecipeMetadata, updateRecipe, saveNewRecipeFromMarkdown } from '@/lib/recipeStorage';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
@@ -211,6 +211,28 @@ export async function updateRecipeAction(slug: string, rawContent: string) {
     return { success: false, error: error.message || 'Failed to update recipe.' };
   }
 }
+
+export async function saveNewRecipeMarkdownAction(rawContent: string) {
+  try {
+    if (!rawContent) {
+      return { success: false, error: 'Content is required.' };
+    }
+
+    const result = saveNewRecipeFromMarkdown(rawContent);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    // Revalidate paths to refresh the home page listing
+    revalidatePath('/');
+    
+    return { success: true, slug: result.slug };
+  } catch (error: any) {
+    console.error('Error saving recipe markdown:', error);
+    return { success: false, error: error.message || 'Failed to save recipe.' };
+  }
+}
+
 
 export async function refineRecipeContentAction(rawContent: string, prompt: string) {
   try {

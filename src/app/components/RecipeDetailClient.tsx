@@ -82,8 +82,8 @@ export default function RecipeDetailClient({
       } else {
         setSaveError(result.error || 'Failed to save changes.');
       }
-    } catch (err: any) {
-      setSaveError(err.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      setSaveError((err as Error).message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
     }
@@ -108,8 +108,8 @@ export default function RecipeDetailClient({
       } else {
         setAiRefineError(result.error || 'Failed to refine content.');
       }
-    } catch (err: any) {
-      setAiRefineError(err.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      setAiRefineError((err as Error).message || 'An unexpected error occurred.');
     } finally {
       setIsAiRefining(false);
     }
@@ -130,11 +130,13 @@ export default function RecipeDetailClient({
 
   if (isEditing) {
     return (
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h2 style={{ fontSize: '1.75rem', color: 'var(--secondary)' }}>Edit Recipe Markdown</h2>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>You can edit both the YAML frontmatter and the recipe body.</span>
-        </div>
+      <div className="recipe-container" style={{ marginTop: '0.5rem' }}>
+        <header style={{ marginBottom: '1.5rem' }}>
+          <h1 className="recipe-title-small" style={{ marginBottom: '0.25rem' }}>Edit Recipe</h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+            You can edit both the YAML frontmatter and the recipe body.
+          </p>
+        </header>
         
         {saveError && (
           <div style={{ backgroundColor: 'var(--primary-light)', borderLeft: '4px solid var(--primary)', padding: '1rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem', fontSize: '0.9rem', color: 'var(--text-color)' }}>
@@ -146,10 +148,8 @@ export default function RecipeDetailClient({
         <div 
           style={{ 
             marginBottom: '1.5rem', 
-            padding: '1.25rem', 
-            backgroundColor: 'var(--secondary-light)', 
-            borderRadius: 'var(--radius-md)', 
-            border: '1px solid var(--border-color)' 
+            paddingBottom: '1.5rem', 
+            borderBottom: '1px solid var(--border-color)' 
           }}
         >
           <label htmlFor="ai-prompt" style={{ display: 'block', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--secondary)' }}>
@@ -197,12 +197,21 @@ export default function RecipeDetailClient({
         </div>
 
         {/* Pre-built Syntax Highlighting Code Editor */}
-        <div style={{ minHeight: '60vh', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+        <div style={{ 
+          minHeight: '60vh',
+          width: '100vw',
+          position: 'relative',
+          left: '50%',
+          right: '50%',
+          marginLeft: '-50vw',
+          marginRight: '-50vw'
+        }}>
           <MarkdownEditor
             ref={textareaRef}
             value={editContent}
             onChange={(val) => setEditContent(val)}
             disabled={isSaving || isAiRefining}
+            originalValue={rawContent}
           />
         </div>
 

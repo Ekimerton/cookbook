@@ -1,13 +1,52 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { extractRecipeAction, saveRecipeAction, extractRecipeFromContentAction, extractRecipeFromYoutubeAction } from '@/app/actions';
+import dynamic from 'next/dynamic';
+import { 
+  extractRecipeAction, 
+  extractRecipeFromContentAction, 
+  extractRecipeFromYoutubeAction,
+  saveNewRecipeMarkdownAction
+} from '@/app/actions';
+import { MarkdownEditorHandle } from '@/app/components/MarkdownEditor';
 import { ExtractedRecipe } from '@/lib/recipeParser';
+
+const MarkdownEditor = dynamic(
+  () => import('@/app/components/MarkdownEditor'),
+  { ssr: false }
+);
+
+const DEFAULT_MARKDOWN_TEMPLATE = `---
+title: "New Recipe"
+originalUrl: "Manual Entry"
+description: ""
+version: 1
+---
+
+# New Recipe
+
+## Ingredients
+
+- 
+
+## Instructions
+
+1. 
+`;
 
 export default function NewRecipePage() {
   const router = useRouter();
+  const editorRef = useRef<MarkdownEditorHandle>(null);
   
+  // View state: 'scrapers' | 'editor'
+  const [viewState, setViewState] = useState<'scrapers' | 'editor'>('scrapers');
+
+  // Manual editor state
+  const [markdownContent, setMarkdownContent] = useState(DEFAULT_MARKDOWN_TEMPLATE);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   // Scraper states
   const [url, setUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -20,22 +59,29 @@ export default function NewRecipePage() {
   const [pasteContent, setPasteContent] = useState('');
   const [showPasteBox, setShowPasteBox] = useState(false);
 
-  // Form states
-  const [recipe, setRecipe] = useState<ExtractedRecipe>({
-    title: '',
-    description: '',
-    ingredients: [],
-    instructions: [],
-    originalUrl: '',
-  });
+  const handleSaveRecipe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!markdownContent.trim()) {
+      setSaveError('Recipe content cannot be empty.');
+      return;
+    }
 
-  const [ingredientsText, setIngredientsText] = useState('');
-  const [instructionsText, setInstructionsText] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  
-  // View state: 'url_input' | 'edit_form'
-  const [viewState, setViewState] = useState<'url_input' | 'edit_form'>('url_input');
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const result = await saveNewRecipeMarkdownAction(markdownContent);
+      if (result.success && result.slug) {
+        router.push(`/recipes/${result.slug}`);
+      } else {
+        setIsSaving(false);
+        setSaveError(result.error || 'Failed to save recipe.');
+      }
+    } catch (err: unknown) {
+      setIsSaving(false);
+      setSaveError((err as Error).message || 'An unexpected error occurred during save.');
+    }
+  };
 
   const handleExtract = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,27 +95,26 @@ export default function NewRecipePage() {
       const result = await extractRecipeAction(url);
       if (result.success && result.data) {
         const extracted = result.data;
-        
-        // If the scraper returned no ingredients and no instructions, treat it as a failure
         if (extracted.ingredients.length === 0 && extracted.instructions.length === 0) {
           throw new Error('We could not extract any ingredients or instructions from this page. You can still add it manually.');
         }
 
         // Save immediately!
-        const saveResult = await saveRecipeAction(extracted);
+        const saveResult = await saveNewRecipeMarkdownAction(
+          formatExtractedToMarkdown(extracted)
+        );
         if (saveResult.success && saveResult.slug) {
           keepSpinner = true;
-          // Take them directly to the recipe page
           router.push(`/recipes/${saveResult.slug}`);
-          return; // Skip setting isExtracting to false to keep spinner active during redirect transition
+          return;
         } else {
           setExtractError(saveResult.error || 'Failed to save the extracted recipe.');
         }
       } else {
         setExtractError(result.error || 'Failed to extract recipe.');
       }
-    } catch (err: any) {
-      setExtractError(err.message || 'An unexpected error occurred during extraction.');
+    } catch (err: unknown) {
+      setExtractError((err as Error).message || 'An unexpected error occurred during extraction.');
     } finally {
       if (!keepSpinner) {
         setIsExtracting(false);
@@ -89,12 +134,13 @@ export default function NewRecipePage() {
       const result = await extractRecipeFromContentAction(pasteContent, url);
       if (result.success && result.data) {
         const extracted = result.data;
-        
         if (extracted.ingredients.length === 0 && extracted.instructions.length === 0) {
           throw new Error('We could not extract any ingredients or instructions from the pasted content.');
         }
 
-        const saveResult = await saveRecipeAction(extracted);
+        const saveResult = await saveNewRecipeMarkdownAction(
+          formatExtractedToMarkdown(extracted)
+        );
         if (saveResult.success && saveResult.slug) {
           keepSpinner = true;
           router.push(`/recipes/${saveResult.slug}`);
@@ -105,8 +151,8 @@ export default function NewRecipePage() {
       } else {
         setExtractError(result.error || 'Failed to parse the pasted content.');
       }
-    } catch (err: any) {
-      setExtractError(err.message || 'An unexpected error occurred during copy-paste extraction.');
+    } catch (err: unknown) {
+      setExtractError((err as Error).message || 'An unexpected error occurred during copy-paste extraction.');
     } finally {
       if (!keepSpinner) {
         setIsExtracting(false);
@@ -131,26 +177,25 @@ export default function NewRecipePage() {
 
       if (result.success && result.data) {
         const extracted = result.data;
-        
         if (extracted.ingredients.length === 0 && extracted.instructions.length === 0) {
           throw new Error('We could not extract any ingredients or instructions from this YouTube video transcript. You can still add it manually.');
         }
 
-        // Save immediately!
-        const saveResult = await saveRecipeAction(extracted);
+        const saveResult = await saveNewRecipeMarkdownAction(
+          formatExtractedToMarkdown(extracted)
+        );
         if (saveResult.success && saveResult.slug) {
           keepSpinner = true;
-          // Take them directly to the recipe page
           router.push(`/recipes/${saveResult.slug}`);
-          return; // Skip setting isExtracting to false to keep spinner active during redirect transition
+          return;
         } else {
           setExtractError(saveResult.error || 'Failed to save the extracted recipe.');
         }
       } else {
         setExtractError(result.error || 'Failed to extract recipe.');
       }
-    } catch (err: any) {
-      setExtractError(err.message || 'An unexpected error occurred during YouTube extraction.');
+    } catch (err: unknown) {
+      setExtractError((err as Error).message || 'An unexpected error occurred during YouTube extraction.');
     } finally {
       if (!keepSpinner) {
         setIsExtracting(false);
@@ -158,75 +203,69 @@ export default function NewRecipePage() {
     }
   };
 
-  // Skip scraping and create manually
-  const handleCreateManually = () => {
-    setRecipe({
-      title: '',
-      description: '',
-      ingredients: [],
-      instructions: [],
-      originalUrl: '',
-    });
-    setIngredientsText('');
-    setInstructionsText('');
-    setViewState('edit_form');
-  };
+  // Helper to serialize ExtractedRecipe object to markdown template format
+  const formatExtractedToMarkdown = (ext: ExtractedRecipe) => {
+    const dateStr = new Date().toISOString().split('T')[0];
+    const frontmatter = `---
+title: "${ext.title || 'New Recipe'}"
+originalUrl: "${ext.originalUrl || 'Manual Entry'}"
+date: "${dateStr}"
+description: "${(ext.description || '').replace(/"/g, '\\"')}"
+version: 1
+---`;
 
-  // Handle manual field updates
-  const handleFieldChange = (key: keyof ExtractedRecipe, value: string) => {
-    setRecipe((prev) => ({ ...prev, [key]: value }));
-  };
+    let stepNum = 1;
+    const stepsMarkdown = ext.instructions
+      .map((step: string) => {
+        if (step.startsWith('### ')) {
+          stepNum = 1;
+          return `\n${step}\n`;
+        }
+        return `${stepNum++}. ${step}`;
+      })
+      .join('\n');
 
-  // Submit the form to save
-  const handleSaveRecipe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!recipe.title.trim()) {
-      setSaveError('A recipe title is required.');
-      return;
-    }
+    return `${frontmatter}
 
-    setIsSaving(true);
-    setSaveError(null);
+# ${ext.title || 'New Recipe'}
 
-    // Process ingredients from textarea
-    const parsedIngredients = ingredientsText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+${ext.description ? `${ext.description}\n` : ''}
+- **Source:** [Original Recipe](${ext.originalUrl || '#'})
 
-    // Process instructions from textarea
-    const parsedInstructions = instructionsText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+## Ingredients
 
-    const recipeData = {
-      ...recipe,
-      title: recipe.title.trim(),
-      originalUrl: recipe.originalUrl.trim() || url.trim() || 'Manual Entry',
-      ingredients: parsedIngredients,
-      instructions: parsedInstructions,
-    };
+${ext.ingredients.map((ing: string) => ing.startsWith('### ') ? `\n${ing}\n` : `- ${ing}`).join('\n')}
 
-    const result = await saveRecipeAction(recipeData);
+## Instructions
 
-    if (result.success && result.slug) {
-      router.push(`/recipes/${result.slug}`);
-      // Do not set isSaving to false, keeping the spinner active during redirect
-    } else {
-      setIsSaving(false);
-      setSaveError(result.error || 'Failed to save recipe.');
-    }
+${stepsMarkdown}
+`.trim();
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-      {viewState === 'url_input' ? (
-        <div style={{ marginTop: '0.5rem' }}>
-          <form onSubmit={handleExtract} style={{ marginBottom: '1.75rem' }}>
+    <div className="recipe-container" style={{ marginTop: '0.5rem' }}>
+      {viewState === 'scrapers' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <h1 className="recipe-title-small" style={{ marginBottom: '0.5rem' }}>New Recipe</h1>
+
+          {extractError && (
+            <div 
+              style={{ 
+                backgroundColor: 'var(--primary-light)', 
+                borderLeft: '4px solid var(--primary)', 
+                padding: '1rem', 
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.9rem',
+                color: 'var(--text-color)'
+              }}
+            >
+              <strong>Scraping Alert:</strong> {extractError}
+            </div>
+          )}
+
+          <form onSubmit={handleExtract} style={{ marginBottom: 0 }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="recipe-url" className="form-label" style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', display: 'block', color: 'var(--secondary)' }}>
+              <label htmlFor="recipe-url" className="form-label" style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', display: 'block', color: 'var(--secondary)' }}>
                 New Recipe from URL
               </label>
               <input
@@ -247,7 +286,7 @@ export default function NewRecipePage() {
               style={{ width: '100%', marginTop: '0.75rem' }}
               disabled={isExtracting}
             >
-              {isExtracting && !youtubeUrl ? (
+              {isExtracting && !youtubeUrl && !pasteContent ? (
                 <>
                   <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
                   Extracting Recipe...
@@ -258,9 +297,9 @@ export default function NewRecipePage() {
             </button>
           </form>
 
-          <form onSubmit={handleExtractYoutube} style={{ marginBottom: '1.25rem' }}>
+          <form onSubmit={handleExtractYoutube} style={{ marginBottom: 0 }}>
             <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label htmlFor="youtube-url" className="form-label" style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', display: 'block', color: 'var(--secondary)' }}>
+              <label htmlFor="youtube-url" className="form-label" style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem', fontFamily: 'var(--font-sans)', display: 'block', color: 'var(--secondary)' }}>
                 New Recipe from YouTube
               </label>
               <input
@@ -320,42 +359,14 @@ export default function NewRecipePage() {
                   Extracting YouTube...
                 </>
               ) : (
-                'Extract Recipe'
+                'Extract YouTube Recipe'
               )}
             </button>
           </form>
 
-          {extractError && (
-            <div 
-              style={{ 
-                backgroundColor: 'var(--primary-light)', 
-                borderLeft: '4px solid var(--primary)', 
-                padding: '1rem', 
-                borderRadius: 'var(--radius-sm)',
-                marginBottom: '1.25rem',
-                fontSize: '0.9rem',
-                color: 'var(--text-color)'
-              }}
-            >
-              <strong>Scraping Alert:</strong> {extractError}
-            </div>
-          )}
-
-          <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-            <button 
-              type="button" 
-              className="btn btn-outline" 
-              onClick={handleCreateManually}
-              disabled={isExtracting}
-              style={{ width: '100%' }}
-            >
-              Write Manually
-            </button>
-          </div>
-
           {/* Copy-paste bypass section */}
-          {(extractError || showPasteBox) && (
-            <div style={{ margin: '1.5rem 0 0 0', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+          {(extractError || showPasteBox) ? (
+            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
               <h3 style={{ fontSize: '1.1rem', marginBottom: '0.35rem', fontFamily: 'var(--font-sans)', color: 'var(--primary)' }}>
                 Bypass Scraper Block with Copy-Paste
               </h3>
@@ -379,10 +390,11 @@ export default function NewRecipePage() {
                 
                 <button
                   type="submit"
-                  className="btn btn-secondary w-full"
+                  className="btn btn-secondary"
+                  style={{ width: '100%' }}
                   disabled={isExtracting || !pasteContent.trim()}
                 >
-                  {isExtracting ? (
+                  {isExtracting && pasteContent ? (
                     <>
                       <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
                       Extracting Paste...
@@ -393,10 +405,8 @@ export default function NewRecipePage() {
                 </button>
               </form>
             </div>
-          )}
-
-          {!extractError && !showPasteBox && (
-            <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
+          ) : (
+            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
               <button
                 type="button"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)', textDecoration: 'underline' }}
@@ -406,121 +416,86 @@ export default function NewRecipePage() {
               </button>
             </div>
           )}
+
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+            <button 
+              type="button" 
+              className="btn btn-outline" 
+              onClick={() => setViewState('editor')}
+              disabled={isExtracting}
+              style={{ width: '100%' }}
+            >
+              Write Manually
+            </button>
+          </div>
         </div>
       ) : (
-        <div style={{ marginTop: '0.5rem' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '1rem', fontFamily: 'var(--font-sans)', color: 'var(--secondary)' }}>
-            New Recipe Details
-          </h2>
-          <form onSubmit={handleSaveRecipe}>
-            <div className="form-group">
-              <label htmlFor="title" className="form-label">Recipe Title *</label>
-              <input
-                id="title"
-                type="text"
-                className="form-input"
-                value={recipe.title}
-                onChange={(e) => handleFieldChange('title', e.target.value)}
-                required
-              />
-            </div>
+        <div>
+          <h1 className="recipe-title-small" style={{ marginBottom: '0.25rem' }}>New Recipe</h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+            Write your recipe manually using markdown.
+          </p>
 
-            <div className="form-group">
-              <label htmlFor="description" className="form-label">Description</label>
-              <textarea
-                id="description"
-                className="form-input"
-                rows={3}
-                value={recipe.description || ''}
-                onChange={(e) => handleFieldChange('description', e.target.value)}
-                style={{ resize: 'vertical' }}
-              />
+          {saveError && (
+            <div 
+              style={{ 
+                backgroundColor: 'var(--primary-light)', 
+                borderLeft: '4px solid var(--primary)', 
+                padding: '1rem', 
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1.5rem',
+                fontSize: '0.9rem',
+                color: 'var(--text-color)'
+              }}
+            >
+              <strong>Validation Error:</strong> {saveError}
             </div>
+          )}
 
-            <div className="form-group">
-              <label htmlFor="ingredients" className="form-label">Ingredients (one per line) *</label>
-              <textarea
-                id="ingredients"
-                className="form-input"
-                rows={8}
-                value={ingredientsText}
-                onChange={(e) => setIngredientsText(e.target.value)}
-                placeholder="1 cup flour&#10;2 large eggs&#10;1/2 tsp salt"
-                required
-                style={{ resize: 'vertical', fontFamily: 'monospace' }}
-              />
-            </div>
+          {/* Pre-built Syntax Highlighting Code Editor */}
+          <div style={{ 
+            minHeight: '60vh',
+            width: '100vw',
+            position: 'relative',
+            left: '50%',
+            right: '50%',
+            marginLeft: '-50vw',
+            marginRight: '-50vw'
+          }}>
+            <MarkdownEditor
+              ref={editorRef}
+              value={markdownContent}
+              onChange={(val) => setMarkdownContent(val)}
+              disabled={isSaving}
+            />
+          </div>
 
-            <div className="form-group">
-              <label htmlFor="instructions" className="form-label">Instructions (one step per line) *</label>
-              <textarea
-                id="instructions"
-                className="form-input"
-                rows={8}
-                value={instructionsText}
-                onChange={(e) => setInstructionsText(e.target.value)}
-                placeholder="Preheat the oven to 350°F.&#10;Mix the ingredients in a large bowl.&#10;### For the frosting&#10;Beat the butter and sugar until smooth."
-                required
-                style={{ resize: 'vertical', fontFamily: 'monospace' }}
-              />
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                Tip: Use lines starting with <code>### </code> to create section sub-headers (like <code>### For the sauce</code>).
-              </p>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="originalUrl" className="form-label">Original Source URL</label>
-              <input
-                id="originalUrl"
-                type="text"
-                className="form-input"
-                value={recipe.originalUrl || url}
-                onChange={(e) => handleFieldChange('originalUrl', e.target.value)}
-              />
-            </div>
-
-            {saveError && (
-              <div 
-                style={{ 
-                  backgroundColor: 'var(--primary-light)', 
-                  borderLeft: '4px solid var(--primary)', 
-                  padding: '1rem', 
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '1.5rem',
-                  fontSize: '0.9rem',
-                  color: 'var(--text-color)'
-                }}
-              >
-                {saveError}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ flex: 1 }}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
-                    Saving Recipe...
-                  </>
-                ) : (
-                  'Save Recipe'
-                )}
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-outline" 
-                onClick={() => setViewState('url_input')}
-                disabled={isSaving}
-              >
-                Back
-              </button>
-            </div>
-          </form>
+          {/* Controls */}
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <button 
+              onClick={handleSaveRecipe} 
+              className="btn btn-primary" 
+              disabled={isSaving}
+              style={{ minWidth: '120px' }}
+            >
+              {isSaving ? (
+                <>
+                  <div className="spinner" style={{ width: '14px', height: '14px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
+                  Saving...
+                </>
+              ) : (
+                'Save Recipe'
+              )}
+            </button>
+            <button 
+              type="button"
+              onClick={() => setViewState('scrapers')} 
+              className="btn btn-outline" 
+              disabled={isSaving}
+            >
+              Back
+            </button>
+          </div>
         </div>
       )}
     </div>
