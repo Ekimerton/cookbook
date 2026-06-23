@@ -28,14 +28,6 @@ export default function RecipeListClient({ initialRecipes }: RecipeListClientPro
           placeholder="Search recipes..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.6rem 1rem',
-            fontSize: '1rem',
-            borderRadius: '4px',
-            border: '1px solid var(--border-color)',
-            outline: 'none',
-          }}
         />
       </div>
 

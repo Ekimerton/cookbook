@@ -160,7 +160,7 @@ export default function RecipeDetailClient({
               id="ai-prompt"
               type="text"
               className="form-input"
-              style={{ flex: 1, minWidth: '200px', backgroundColor: '#fff' }}
+              style={{ flex: 1, minWidth: '200px' }}
               placeholder="Ask AI to edit... e.g., 'make green onions optional', 'get rid of the intro bit', 'add a note about freezing'"
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
