@@ -20,7 +20,7 @@ export default function RecipeListClient({ initialRecipes }: RecipeListClientPro
   );
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ marginBottom: '1rem' }}>
         <input
           type="text"

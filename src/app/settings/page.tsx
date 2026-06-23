@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function SettingsPage() {
   return (
-    <div style={{ maxWidth: '600px', margin: '2rem auto' }}>
+    <div style={{ maxWidth: '800px', margin: '2rem auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
         <svg 
           xmlns="http://www.w3.org/2000/svg" 

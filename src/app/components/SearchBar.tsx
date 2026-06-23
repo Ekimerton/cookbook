@@ -25,7 +25,7 @@ export default function SearchBar() {
   };
 
   return (
-    <div className="form-group" style={{ maxWidth: '600px', margin: '0 auto 2rem auto', position: 'relative' }}>
+    <div className="form-group" style={{ maxWidth: '800px', margin: '0 auto 2rem auto', position: 'relative' }}>
       <input
         type="text"
         className="form-input"

@@ -129,7 +129,7 @@ a:hover {
 }
 
 .header-content {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
@@ -225,7 +225,7 @@ a:hover {
 
 .main-content {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
   padding: 4.5rem 1.5rem 1.5rem 1.5rem;
@@ -677,14 +677,31 @@ a:hover {
 }
 
 /* Monospace Editor Styles */
-.editor-container {
+.editor-wrapper-responsive {
+  min-height: 60vh;
+  width: 100vw;
   position: relative;
-  width: 100%;
-  height: 60vh;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background-color: #faf8f5;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-color);
   overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .editor-wrapper-responsive {
+    width: 100%;
+    position: relative;
+    left: auto;
+    right: auto;
+    margin-left: 0;
+    margin-right: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+  }
 }
 
 .editor-textarea {
@@ -826,7 +843,7 @@ a:hover {
 
 /* Simplistic Recipe Page Redesign Styles */
 .recipe-container {
-  max-width: 680px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 0 0 1rem 0;
 }

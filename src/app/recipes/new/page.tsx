@@ -453,15 +453,7 @@ ${stepsMarkdown}
           )}
 
           {/* Pre-built Syntax Highlighting Code Editor */}
-          <div style={{ 
-            minHeight: '60vh',
-            width: '100vw',
-            position: 'relative',
-            left: '50%',
-            right: '50%',
-            marginLeft: '-50vw',
-            marginRight: '-50vw'
-          }}>
+          <div className="editor-wrapper-responsive">
             <MarkdownEditor
               ref={editorRef}
               value={markdownContent}
