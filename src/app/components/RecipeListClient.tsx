@@ -128,6 +128,14 @@ export default function RecipeListClient({ initialRecipes }: RecipeListClientPro
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', position: 'relative' }}>
+      <style>{`
+        @keyframes pulse {
+          0% { opacity: 0.6; }
+          50% { opacity: 0.35; }
+          100% { opacity: 0.6; }
+        }
+      `}</style>
+
       {/* Pull-to-refresh floating pill */}
       {(pullDistance > 0 || pullState === 'refreshing' || pullState === 'success' || pullState === 'error') && (
         <div 
