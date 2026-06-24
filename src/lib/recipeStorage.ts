@@ -3,6 +3,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import { spawn, spawnSync } from 'child_process';
 import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from './settings';
 
 export interface RecipeMetadata {
   title: string;
@@ -53,24 +54,6 @@ function runGitCommand(args: string[]): Promise<string> {
       }
     });
   });
-}
-
-function getGeminiApiKey(): string | undefined {
-  let apiKey = process.env.GEMINI_API_KEY;
-  try {
-    const settingsPath = path.join(process.cwd(), 'user-settings.json');
-    if (fs.existsSync(settingsPath)) {
-      const fileContent = fs.readFileSync(settingsPath, 'utf-8');
-      const settings = JSON.parse(fileContent);
-      const key = settings.GEMINI_API_KEY || settings.geminiApiKey || settings.gemini_api_key;
-      if (key) {
-        apiKey = key;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to read user-settings.json:', e);
-  }
-  return apiKey;
 }
 
 // Automatically stage, commit and push recipe on creation or update

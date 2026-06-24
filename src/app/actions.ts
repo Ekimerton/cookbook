@@ -7,24 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { GoogleGenAI } from '@google/genai';
 
-// Helper to load the local settings key on the server
-function getGeminiApiKey(): string | undefined {
-  let apiKey = process.env.GEMINI_API_KEY;
-  try {
-    const settingsPath = path.join(process.cwd(), 'user-settings.json');
-    if (fs.existsSync(settingsPath)) {
-      const fileContent = fs.readFileSync(settingsPath, 'utf-8');
-      const settings = JSON.parse(fileContent);
-      const key = settings.GEMINI_API_KEY || settings.geminiApiKey || settings.gemini_api_key;
-      if (key) {
-        apiKey = key;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to read user-settings.json:', e);
-  }
-  return apiKey;
-}
+import { getSettings, saveSettings, getGeminiApiKey } from '@/lib/settings';
+import { getGitStatus, initGitRepo, configureRemote, pullFromRemote, pushToRemote, cloneRemote } from '@/lib/git';
 
 export async function extractRecipeAction(url: string) {
   try {
@@ -289,5 +273,78 @@ ${rawContent}`
   } catch (error: any) {
     console.error('Error refining recipe with AI:', error);
     return { success: false, error: error.message || 'AI refinement failed.' };
+  }
+}
+
+export async function getSettingsAction() {
+  try {
+    return { success: true, data: getSettings() };
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
+export async function saveSettingsAction(settings: { GEMINI_API_KEY?: string; RECIPE_GIT_REPO?: string }) {
+  try {
+    saveSettings(settings);
+    
+    // If a Git remote repository was updated in the settings, configure it in Git as well
+    if (settings.RECIPE_GIT_REPO !== undefined) {
+      const status = await getGitStatus();
+      if (status.initialized) {
+        await configureRemote(settings.RECIPE_GIT_REPO);
+      }
+    }
+    
+    revalidatePath('/settings');
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
+export async function getGitStatusAction() {
+  try {
+    const status = await getGitStatus();
+    return { success: true, data: status };
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
+export async function initializeGitRepoAction() {
+  try {
+    const result = await initGitRepo();
+    revalidatePath('/settings');
+    return result;
+  } catch (e: any) {
+    return { success: false, output: '', error: e.message || String(e) };
+  }
+}
+
+export async function syncGitAction(type: 'push' | 'pull') {
+  try {
+    let result;
+    if (type === 'pull') {
+      result = await pullFromRemote();
+    } else {
+      result = await pushToRemote();
+    }
+    revalidatePath('/');
+    revalidatePath('/settings');
+    return result;
+  } catch (e: any) {
+    return { success: false, output: '', error: e.message || String(e) };
+  }
+}
+
+export async function cloneGitRepoAction(url: string) {
+  try {
+    const result = await cloneRemote(url);
+    revalidatePath('/');
+    revalidatePath('/settings');
+    return result;
+  } catch (e: any) {
+    return { success: false, output: '', error: e.message || String(e) };
   }
 }

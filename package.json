@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "create-repo": "bash scripts/create-repo.sh",
+    "import-repo": "bash scripts/import-repo.sh"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
