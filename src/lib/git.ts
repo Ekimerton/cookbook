@@ -15,9 +15,11 @@ export interface GitStatus {
   error?: string;
 }
 
-// Utility to run git command in recipes folder
+let gitQueue = Promise.resolve();
+
+// Utility to run git command in recipes folder sequentially
 function runGit(args: string[], cwd = RECIPES_DIR): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve) => {
+  const run = () => new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
     // Ensure dir exists if not cloning
     if (!fs.existsSync(cwd) && !args.includes('clone')) {
       fs.mkdirSync(cwd, { recursive: true });
@@ -38,6 +40,10 @@ function runGit(args: string[], cwd = RECIPES_DIR): Promise<{ stdout: string; st
       });
     });
   });
+
+  const nextPromise = gitQueue.then(run, run);
+  gitQueue = nextPromise.then(() => {}, () => {});
+  return nextPromise;
 }
 
 export async function getGitStatus(): Promise<GitStatus> {

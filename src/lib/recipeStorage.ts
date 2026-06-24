@@ -326,7 +326,7 @@ export function getAllRecipes(): (RecipeMetadata & { slug: string })[] {
 
   const files = fs.readdirSync(RECIPES_DIR);
   const recipes = files
-    .filter((file) => file.endsWith('.md'))
+    .filter((file) => file.endsWith('.md') && file.toLowerCase() !== 'readme.md')
     .map((file) => {
       const slug = file.substring(0, file.length - 3);
       const filePath = path.join(RECIPES_DIR, file);
@@ -357,6 +357,10 @@ export function getAllRecipes(): (RecipeMetadata & { slug: string })[] {
 // Get specific recipe details by slug, optionally from a specific commit
 export function getRecipeBySlug(slug: string, commitSha?: string): RecipeFile | null {
   ensureRecipesDir();
+
+  if (slug.toLowerCase() === 'readme') {
+    return null;
+  }
 
   const filePath = path.join(RECIPES_DIR, `${slug}.md`);
   if (!fs.existsSync(filePath)) {
@@ -409,6 +413,11 @@ export function getRecipeBySlug(slug: string, commitSha?: string): RecipeFile | 
 // Get git commit history and version numbering for a recipe
 export function getRecipeRevisions(slug: string): RecipeRevision[] {
   ensureRecipesDir();
+
+  if (slug.toLowerCase() === 'readme') {
+    return [];
+  }
+
   const filename = `${slug}.md`;
   const filePath = path.join(RECIPES_DIR, filename);
   if (!fs.existsSync(filePath)) {

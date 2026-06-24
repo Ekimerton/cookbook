@@ -144,7 +144,7 @@ export default function RecipeDetailClient({
           </div>
         )}
 
-        {/* AI Copilot Panel */}
+        {/* AI Assistant Panel */}
         <div 
           style={{ 
             marginBottom: '1.5rem', 
@@ -153,7 +153,7 @@ export default function RecipeDetailClient({
           }}
         >
           <label htmlFor="ai-prompt" style={{ display: 'block', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--secondary)' }}>
-            AI Recipe Assistant (Copilot)
+            AI Recipe Assistant
           </label>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <input
@@ -161,7 +161,7 @@ export default function RecipeDetailClient({
               type="text"
               className="form-input"
               style={{ flex: 1, minWidth: '200px' }}
-              placeholder="Ask AI to edit... e.g., 'make green onions optional', 'get rid of the intro bit', 'add a note about freezing'"
+              placeholder="e.g., 'change tuna to salmon'"
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
               onKeyDown={(e) => {
@@ -191,7 +191,7 @@ export default function RecipeDetailClient({
           
           {aiRefineError && (
             <div style={{ color: 'var(--primary)', fontSize: '0.85rem', marginTop: '0.5rem', fontWeight: 'bold' }}>
-              Copilot Error: {aiRefineError}
+              AI Assistant Error: {aiRefineError}
             </div>
           )}
         </div>

@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getRecipeBySlug, getRecipeRevisions } from '@/lib/recipeStorage';
 import RecipeDetailClient from '@/app/components/RecipeDetailClient';
+import { pullFromRemote, getGitStatus } from '@/lib/git';
+
+export const dynamic = 'force-dynamic';
 
 interface RecipePageProps {
   params: Promise<{ id: string }>;
@@ -24,6 +27,17 @@ export async function generateMetadata({ params, searchParams }: RecipePageProps
 export default async function RecipePage({ params, searchParams }: RecipePageProps) {
   const { id } = await params;
   const { rev } = await searchParams;
+
+  // Run git pull on recipe open if configured
+  try {
+    const gitStatus = await getGitStatus();
+    if (gitStatus.initialized && gitStatus.remoteUrl) {
+      await pullFromRemote();
+    }
+  } catch (err) {
+    console.error('Failed to pull from remote on recipe open:', err);
+  }
+
   const recipeFile = getRecipeBySlug(id, rev);
 
   if (!recipeFile) {
