@@ -72,7 +72,7 @@ async function gitCommitAndPushRecipe(filename: string, title: string, isUpdate:
         if (diff && apiKey) {
           const ai = new GoogleGenAI({ apiKey });
           const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.5-flash',
             contents: [
               {
                 text: `You are an expert culinary developer. You will be given a git diff of updates made to a recipe file named "${title}".
