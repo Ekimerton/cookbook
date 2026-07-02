@@ -1,7 +1,7 @@
 'use server';
 
 import { scrapeRecipe, ExtractedRecipe, parseRecipeContentWithGemini, withRetry, getYoutubeVideoId, parseTimeToSeconds, getYoutubeTranscript, parseYoutubeTranscriptWithGemini } from '@/lib/recipeParser';
-import { saveRecipe, RecipeMetadata, updateRecipe, saveNewRecipeFromMarkdown } from '@/lib/recipeStorage';
+import { saveRecipe, RecipeMetadata, updateRecipe, saveNewRecipeFromMarkdown, deleteRecipe } from '@/lib/recipeStorage';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
@@ -159,7 +159,7 @@ export async function saveRecipeAction(recipeData: Omit<RecipeMetadata, 'date' |
       return { success: false, error: 'Recipe original URL is required.' };
     }
 
-    const slug = saveRecipe(recipeData);
+    const slug = await saveRecipe(recipeData);
     
     // Revalidate paths to refresh the home page listing
     revalidatePath('/');
@@ -180,7 +180,7 @@ export async function updateRecipeAction(slug: string, rawContent: string) {
       return { success: false, error: 'Content is required.' };
     }
 
-    const result = updateRecipe(slug, rawContent);
+    const result = await updateRecipe(slug, rawContent);
     if (!result.success) {
       return { success: false, error: result.error };
     }
@@ -202,7 +202,7 @@ export async function saveNewRecipeMarkdownAction(rawContent: string) {
       return { success: false, error: 'Content is required.' };
     }
 
-    const result = saveNewRecipeFromMarkdown(rawContent);
+    const result = await saveNewRecipeFromMarkdown(rawContent);
     if (!result.success) {
       return { success: false, error: result.error };
     }
@@ -346,5 +346,16 @@ export async function cloneGitRepoAction(url: string) {
     return result;
   } catch (e: any) {
     return { success: false, output: '', error: e.message || String(e) };
+  }
+}
+
+export async function deleteRecipeAction(slug: string) {
+  try {
+    const result = deleteRecipe(slug);
+    revalidatePath('/');
+    revalidatePath(`/recipes/${slug}`);
+    return result;
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) };
   }
 }

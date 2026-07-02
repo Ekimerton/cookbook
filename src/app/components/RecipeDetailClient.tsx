@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RecipeMetadata, RecipeRevision } from '@/lib/recipeStorage';
-import { updateRecipeAction, refineRecipeContentAction } from '@/app/actions';
+import { updateRecipeAction, refineRecipeContentAction, deleteRecipeAction } from '@/app/actions';
 import React from 'react';
 import dynamic from 'next/dynamic';
 
@@ -42,6 +42,10 @@ export default function RecipeDetailClient({
   const [editContent, setEditContent] = useState(rawContent);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Deletion states
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // AI Copilot states
   const [aiPrompt, setAiPrompt] = useState('');
@@ -86,6 +90,24 @@ export default function RecipeDetailClient({
       setSaveError((err as Error).message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setSaveError(null);
+    try {
+      const result = await deleteRecipeAction(slug);
+      if (result.success) {
+        window.location.href = '/';
+      } else {
+        setSaveError(result.error || 'Failed to delete recipe.');
+      }
+    } catch (err: unknown) {
+      setSaveError((err as Error).message || 'An unexpected error occurred during deletion.');
+    } finally {
+      setIsDeleting(false);
+      setIsConfirmingDelete(false);
     }
   };
 
@@ -208,8 +230,8 @@ export default function RecipeDetailClient({
         </div>
 
         {/* Save/Cancel Controls */}
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || isAiRefining} style={{ minWidth: '120px' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || isAiRefining || isConfirmingDelete} style={{ minWidth: '120px' }}>
             {isSaving ? (
               <>
                 <div className="spinner" style={{ width: '14px', height: '14px', borderTopColor: '#fff', marginRight: '0.5rem' }} />
@@ -228,10 +250,54 @@ export default function RecipeDetailClient({
               setAiRefineError(null);
             }} 
             className="btn btn-outline" 
-            disabled={isSaving || isAiRefining}
+            disabled={isSaving || isAiRefining || isConfirmingDelete}
           >
             Cancel
           </button>
+        </div>
+
+        {/* Delete Controls (in a separate row underneath, aligned and responsive) */}
+        <div className="delete-action-row">
+          {isConfirmingDelete ? (
+            <div className="delete-confirm-box">
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-color)', fontWeight: 500 }}>
+                Are you sure you want to delete this recipe?
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'flex-end' }} className="delete-confirm-buttons-wrapper">
+                <button 
+                  type="button" 
+                  onClick={handleDelete} 
+                  className="btn btn-danger" 
+                  disabled={isDeleting}
+                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', flex: 1, minWidth: '80px', maxWidth: '120px' }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsConfirmingDelete(false)} 
+                  className="btn btn-outline" 
+                  disabled={isDeleting}
+                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', backgroundColor: '#fff', flex: 1, minWidth: '80px', maxWidth: '120px' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)} 
+              className="btn btn-danger-outline btn-delete-full" 
+              disabled={isSaving || isAiRefining}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style={{ marginRight: '0.25rem' }}>
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+              </svg>
+              Delete Recipe
+            </button>
+          )}
         </div>
       </div>
     );

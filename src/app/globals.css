@@ -404,6 +404,25 @@ a:hover {
   background-color: var(--border-color);
 }
 
+.btn-danger {
+  background-color: #d32f2f;
+  color: #FFFFFF;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #b71c1c;
+}
+
+.btn-danger-outline {
+  background-color: transparent;
+  border: 1px solid #d32f2f;
+  color: #d32f2f;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background-color: rgba(211, 47, 47, 0.05);
+}
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1084,5 +1103,40 @@ a:hover {
 @media (prefers-color-scheme: dark) {
   .cm-diff-deleted-inline {
     color: #f87171;
+  }
+}
+
+.delete-action-row {
+  display: flex;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.5rem;
+  justify-content: flex-end;
+}
+
+.btn-delete-full {
+  width: 100%;
+}
+
+.delete-confirm-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: var(--primary-light);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--primary);
+  width: 100%;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .btn-delete-full {
+    width: auto;
+  }
+  .delete-confirm-box {
+    flex-direction: row;
+    justify-content: space-between;
+    width: auto;
   }
 }

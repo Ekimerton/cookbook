@@ -262,7 +262,7 @@ export function parseMarkdownRecipeBody(body: string): { ingredients: string[]; 
 }
 
 // Save recipe to markdown file
-export function saveRecipe(recipe: Omit<RecipeMetadata, 'date' | 'version'>): string {
+export async function saveRecipe(recipe: Omit<RecipeMetadata, 'date' | 'version'>): Promise<string> {
   ensureRecipesDir();
 
   const slugBase = slugify(recipe.title) || 'recipe';
@@ -315,7 +315,7 @@ ${stepsMarkdown}
   fs.writeFileSync(filePath, fileContent, 'utf-8');
 
   // Trigger Git operations in the background
-  gitCommitAndPushRecipe(`${slug}.md`, recipe.title);
+  await gitCommitAndPushRecipe(`${slug}.md`, recipe.title);
 
   return slug;
 }
@@ -487,7 +487,7 @@ export function getRecipeRevisions(slug: string): RecipeRevision[] {
   }
 }
 
-export function saveNewRecipeFromMarkdown(rawContent: string): { success: boolean; slug?: string; error?: string } {
+export async function saveNewRecipeFromMarkdown(rawContent: string): Promise<{ success: boolean; slug?: string; error?: string }> {
   ensureRecipesDir();
 
   let parsed: ReturnType<typeof matter>;
@@ -523,12 +523,12 @@ export function saveNewRecipeFromMarkdown(rawContent: string): { success: boolea
   fs.writeFileSync(filePath, fileContent, 'utf-8');
 
   // Trigger Git operations in the background
-  gitCommitAndPushRecipe(`${slug}.md`, title.trim());
+  await gitCommitAndPushRecipe(`${slug}.md`, title.trim());
 
   return { success: true, slug };
 }
 
-export function updateRecipe(slug: string, rawContent: string): { success: boolean; error?: string } {
+export async function updateRecipe(slug: string, rawContent: string): Promise<{ success: boolean; error?: string }> {
   ensureRecipesDir();
   const filePath = path.join(RECIPES_DIR, `${slug}.md`);
   if (!fs.existsSync(filePath)) {
@@ -555,8 +555,58 @@ export function updateRecipe(slug: string, rawContent: string): { success: boole
   fs.writeFileSync(filePath, fileContent, 'utf-8');
 
   // Trigger git update in the background (isUpdate = true)
-  gitCommitAndPushRecipe(`${slug}.md`, displayTitle, true);
+  await gitCommitAndPushRecipe(`${slug}.md`, displayTitle, true);
 
   return { success: true };
+}
+
+export function deleteRecipe(slug: string): { success: boolean; error?: string } {
+  ensureRecipesDir();
+  const filename = `${slug}.md`;
+  const filePath = path.join(RECIPES_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return { success: false, error: 'Recipe file does not exist.' };
+  }
+
+  // Get the title first for git commit message
+  let title = slug;
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const { content } = matter(fileContent);
+    const parsed = parseMarkdownRecipeBodyFields(content);
+    if (parsed.title) {
+      title = parsed.title;
+    }
+  } catch (err) {
+    console.error('Failed to parse title for deletion commit:', err);
+  }
+
+  try {
+    fs.unlinkSync(filePath);
+  } catch (err: unknown) {
+    return { success: false, error: `Failed to delete file: ${(err as Error).message}` };
+  }
+
+  // Trigger git operations in the background
+  gitCommitAndPushDelete(filename, title);
+
+  return { success: true };
+}
+
+async function gitCommitAndPushDelete(filename: string, title: string) {
+  try {
+    // Stage deletion
+    await runGitCommand(['rm', filename]).catch(() => runGitCommand(['add', filename]));
+    // Commit
+    const commitMsg = `Delete ${title}`;
+    await runGitCommand(['commit', '-m', commitMsg]);
+    // Push if remote configured
+    const remote = await runGitCommand(['remote']);
+    if (remote) {
+      await runGitCommand(['push']);
+    }
+  } catch (err) {
+    console.error('Git deletion integration error (non-fatal):', err);
+  }
 }
 
